@@ -86,3 +86,4 @@ resumatch-extension/
 └── README.md              # This file
 ```
 # extension
+# chrome-extension
