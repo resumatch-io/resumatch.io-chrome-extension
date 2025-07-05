@@ -88,3 +88,4 @@ resumatch-extension/
 # extension
 # chrome-extension
 # chrome-extension
+# chrome-extension
