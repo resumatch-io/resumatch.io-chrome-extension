@@ -1,6 +1,5 @@
 chrome.runtime.onInstalled.addListener(() => {
   const menuItems = [
-    { id: "open-resumatch", title: "Open ResuMatch.io" },
     { id: "save-job", title: "Save Job" },
     { id: "save-contact", title: "Save Contact" },
     { id: "find-email", title: "Find E-mail" },
@@ -22,9 +21,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!tab?.id) return
 
   switch (info.menuItemId) {
-    case "open-resumatch":
-      chrome.tabs.sendMessage(tab.id, { action: "openSidebar" })
-      break
     case "save-job":
     case "save-contact":
     case "find-email":
@@ -48,17 +44,50 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 })
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "captureScreenshot") {
-    chrome.tabs.captureVisibleTab(
-      sender.tab?.windowId, 
-      { format: "png" }, 
-      (image) => {
-        sendResponse(image 
-          ? { status: "success", screenshot: image }
-          : { status: "error", message: "Failed to capture screenshot" }
-        )
-      }
-    )
+  // resume genearator
+  if (message.action === "GENERATE_RESUME") {
+    const body = {
+      parsedText: message.parsedText || "",
+      jobDescription: message.jobDescription || ""
+    }
+    fetch("https://resumatch.io/api/external/generate-resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(res => res.json())
+      .then(data => {
+        sendResponse({ success: true, data })
+      })
+      .catch(error => {
+        sendResponse({ success: false, error: error.message })
+      })
     return true
   }
+
+  // Save Resume 
+  if (message.action === "SAVE_RESUME") {
+    const body = {
+      parsedText: message.parsedText ,
+      text: message.text,
+      jobDescription: message.jobDescription ,
+      name: "sai",
+      summary: message.summary,
+      resumeTemplate: "Default"
+    }
+    fetch("https://resumatch.io/api/external/resumes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(res => res.json())
+      .then(data => {
+        sendResponse({ success: true, data })
+      })
+      .catch(error => {
+        sendResponse({ success: false, error: error.message })
+      })
+    return true 
+  }
 })
+

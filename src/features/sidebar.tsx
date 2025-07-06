@@ -35,6 +35,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
   const [showResume, setShowResume] = useState(false);
   const [jobDescription, setJobDescription] = useState('');
   const [capturedScreenshot, setCapturedScreenshot] = useState<string | null>(null);
+  const [shareableLink, setShareableLink] = useState<string | null>(null);
   const { user } = useUser();
   const { signOut } = useClerk();
 
@@ -84,16 +85,21 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
     setCurrentPage("tailor");
   };
 
-  const handleTailorStart = () => {
+  const handleTailorStart = (link?: string) => {
     setShowLoading(true);
-    setTimeout(() => {
+    setShowResume(false);
+    if (link) {
       setShowLoading(false);
       setShowResume(true);
-    }, 5000);
+      setShareableLink(link);
+    } else {
+      setShareableLink(null);
+    }
   };
 
   const handleResumeBack = () => {
     setShowResume(false);
+    setShowLoading(false);
     setSelectedResume(null);
     setJobDescription('');
     setCurrentPage("main");
@@ -120,21 +126,17 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
         <img src={resumatchLogo} alt="Resumatch Logo" className="w-6 h-6" />
         <span className="text-sm font-semibold text-gray-900">Resumatch.io</span>
       </div>
-
-      <div className="absolute top-4 right-4">
-        <SignedIn>
-          <button
-            onClick={handleSignOut}
-            className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-            title="Sign Out"
-          >
-            <FiLogOut className="text-sm" />
-          </button>
-        </SignedIn>
-      </div>
     </div>
   );
 
+  const handleMouseEnter = () => {
+    setIsVisible(true);
+  };
+
+  const handleClose = () => {
+    setIsVisible(false);
+    if (onClose) onClose();
+  };
 
   return (
     <>
@@ -160,17 +162,14 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
       {(isVisible || forceVisible) && (
         <div
           className="fixed top-5 right-5 bottom-5 w-[400px] max-w-[90vw] z-[999999] bg-white rounded-2xl shadow-2xl border border-gray-200 font-sans animate-slide-in-right flex flex-col overflow-hidden"
-          onMouseLeave={() => !forceVisible && setIsVisible(false)}
         >
-          {forceVisible && onClose && (
-            <button
-              onClick={onClose}
-              className="absolute top-3 right-3 z-[1000000] p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-              title="Close"
-            >
-              <FiX className="text-lg" />
-            </button>
-          )}
+          <button
+            onClick={handleClose}
+            className="absolute top-3 right-3 z-[1000000] p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+            title="Close"
+          >
+            <FiX className="text-lg" />
+          </button>
           <div className="flex flex-col w-full h-full min-h-0">
             {currentPage === "tailor" ? (
               <>
@@ -182,10 +181,10 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                       <p className="text-lg font-bold text-[#4A3AFF]">Tailoring your resume...</p>
                     </div>
                   ) : showResume ? (
-                    <ResumePage onBack={handleResumeBack} />
+                    <ResumePage onBack={handleResumeBack} shareableLink={shareableLink || undefined} />
                   ) : (
-                    <TailorResumePage 
-                      onSelectFromCollections={() => setCurrentPage("select")} 
+                    <TailorResumePage
+                      onSelectFromCollections={() => setCurrentPage("select")}
                       selectedResume={selectedResume}
                       onTailorStart={handleTailorStart}
                       onResumeRemove={() => setSelectedResume(null)}
@@ -208,7 +207,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
               <>
                 {renderPageHeader("main")}
                 <div className="flex-1 min-h-0">
-                  <Screenshot 
+                  <Screenshot
                     onScreenshotCaptured={handleScreenshotCaptured}
                     initialScreenshot={capturedScreenshot}
                   />

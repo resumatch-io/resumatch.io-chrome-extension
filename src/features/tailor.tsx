@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react'
-import { Upload, CheckCircle } from 'lucide-react'
+import { Upload, CheckCircle, Loader2 } from 'lucide-react'
 import { SignedIn, SignedOut } from "@clerk/chrome-extension"
+import { parseDocument } from '../api/parse'
+import type { ParseResult } from '../api/parse'
 
 interface TailorResumePageProps {
   onSelectFromCollections?: () => void
   selectedResume?: string | null
-  onTailorStart?: () => void
+  onTailorStart?: (shareableLink: string) => void
   onResumeRemove?: () => void
   jobDescriptionText?: string
   onJobDescriptionChange?: (text: string) => void
@@ -25,15 +27,18 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
 }) => {
   const [jobDescription, setJobDescription] = useState(jobDescriptionText)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [parsedText, setParsedText] = useState<string>('')
   const [isDragOver, setIsDragOver] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const validateFile = (file: File) => {
-    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'text/plain']
+    const allowedTypes = ['application/pdf']
     const maxSize = 5 * 1024 * 1024
     
     if (!allowedTypes.includes(file.type)) {
-      alert('Please upload a PDF, DOCX, DOC, or TXT file.')
+      alert('Please upload a PDF file only.')
       return false
     }
     if (file.size > maxSize) {
@@ -43,21 +48,62 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     return true
   }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const parseDocumentLocal = async (file: File) => {
+    try {
+      const result = await parseDocument(file)
+      return result
+    } catch (error) {
+      const fallbackResult: ParseResult = {
+        fileName: file.name,
+        parsedText: `File processing failed for ${file.name}. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try with a different file.`,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+      return fallbackResult
+    }
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     onFileDialogClose?.()
     const file = event.target.files?.[0]
+    
     if (file && validateFile(file)) {
+      setIsUploading(true)
       setUploadedFile(file)
+      
+      try {
+        const result = await parseDocumentLocal(file)
+        setParsedText(result.parsedText)
+      } catch (error) {
+        alert("There was an error parsing your document. Please try again.")
+        setUploadedFile(null)
+        setParsedText('')
+      } finally {
+        setIsUploading(false)
+      }
     }
+    
     if (event.target) event.target.value = ''
   }
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     setIsDragOver(false)
     const file = event.dataTransfer.files[0]
+    
     if (file && validateFile(file)) {
+      setIsUploading(true)
       setUploadedFile(file)
+      
+      try {
+        const result = await parseDocumentLocal(file)
+        setParsedText(result.parsedText)
+      } catch (error) {
+        alert("There was an error parsing your document. Please try again.")
+        setUploadedFile(null)
+        setParsedText('')
+      } finally {
+        setIsUploading(false)
+      }
     }
   }
 
@@ -66,8 +112,64 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     fileInputRef.current?.click()
   }
 
+  const handleRemoveFile = () => {
+    setUploadedFile(null)
+    setParsedText('')
+  }
+
   const isFormComplete = () => {
     return (selectedResume || uploadedFile) && jobDescription.trim().length > 0
+  }
+
+  const handleTailorResume = async () => {
+    if (!parsedText || !jobDescription.trim()) {
+      alert('Please upload a resume and enter a job description.')
+      return
+    }
+    if (onTailorStart) onTailorStart('')
+    setIsGenerating(true)
+    try {
+      chrome.runtime.sendMessage(
+        {
+          action: 'GENERATE_RESUME',
+          parsedText,
+          jobDescription
+        },
+        (response) => {
+          if (response?.success && response.data?.resume) {
+            const summary = Array.isArray(response.data.resume.summary) && response.data.resume.summary.length > 0
+              ? response.data.resume.summary[0]
+              : '';
+            console.log(response.data.resume);
+            chrome.runtime.sendMessage(
+              {
+                action: 'SAVE_RESUME',
+                parsedText,
+                text: response.data.resume,
+                jobDescription,
+                summary,
+                resumeTemplate: 'Default'
+              },
+              (saveResponse) => {
+                setIsGenerating(false)
+                if (saveResponse?.success && saveResponse.data?.resumeId) {
+                  const link = `https://resumatch.io/share/${saveResponse.data.resumeId}`;
+                  if (onTailorStart) onTailorStart(link)
+                } else {
+                  alert('There was an error saving your tailored resume.')
+                }
+              }
+            )
+          } else {
+            setIsGenerating(false)
+            alert('There was an error generating your tailored resume.')
+          }
+        }
+      )
+    } catch (error) {
+      setIsGenerating(false)
+      alert('There was an error generating your tailored resume.')
+    }
   }
 
   return (
@@ -100,7 +202,8 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
             <div className="flex justify-center space-x-4 mb-3">
               <button 
                 onClick={handleUploadButtonClick}
-                className="text-xs font-semibold text-gray-800 hover:text-blue-600 transition-colors"
+                disabled={isUploading}
+                className="text-xs font-semibold text-gray-800 hover:text-blue-600 transition-colors disabled:opacity-50"
               >
                 Upload Resume
               </button>
@@ -128,7 +231,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.docx,.doc,.txt"
+            accept=".pdf"
             onChange={handleFileUpload}
             className="hidden"
           />
@@ -136,16 +239,24 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           {uploadedFile ? (
             <div className="bg-white border-2 border-[#4A3AFF] rounded-lg p-4 text-center">
               <div className="mx-auto w-10 h-10 bg-[#4A3AFF] rounded-full flex items-center justify-center mb-2">
-                <CheckCircle className="w-5 h-5 text-white" />
+                {isUploading ? (
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                ) : (
+                  <CheckCircle className="w-5 h-5 text-white" />
+                )}
               </div>
-              <p className="text-xs font-semibold text-[#4A3AFF] mb-1">Resume Uploaded</p>
+              <p className="text-xs font-semibold text-[#4A3AFF] mb-1">
+                {isUploading ? 'Processing Resume...' : 'Resume Uploaded'}
+              </p>
               <p className="text-xs text-gray-600 mb-1">{uploadedFile.name}</p>
-              <button 
-                onClick={() => setUploadedFile(null)}
-                className="text-[10px] text-[#4A3AFF] hover:underline"
-              >
-                Remove File
-              </button>
+              {!isUploading && (
+                <button 
+                  onClick={handleRemoveFile}
+                  className="text-[10px] text-[#4A3AFF] hover:underline"
+                >
+                  Remove File
+                </button>
+              )}
             </div>
           ) : selectedResume ? (
             <div className="bg-white border-2 border-[#4A3AFF] rounded-lg p-4 text-center">
@@ -177,18 +288,24 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
                 isDragOver 
                   ? 'border-[#4A3AFF] bg-[#4A3AFF]/5' 
                   : 'border-gray-300 hover:border-gray-400'
-              }`}
+              } ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
               onClick={handleUploadButtonClick}
               onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
               onDragLeave={(e) => { e.preventDefault(); setIsDragOver(false) }}
             >
               <div className="mx-auto w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-                <Upload className="w-4 h-4 text-gray-400" />
+                {isUploading ? (
+                  <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4 text-gray-400" />
+                )}
               </div>
-              <p className="text-xs text-gray-600 mb-1">Click or Drag to add your resume.</p>
+              <p className="text-xs text-gray-600 mb-1">
+                {isUploading ? 'Processing...' : 'Click or Drag to add your resume.'}
+              </p>
               <p className="text-[10px] text-gray-500 mb-1">or drag and drop</p>
-              <p className="text-[10px] text-gray-400">PDF, DOCX, DOC, TXT up to 5MB.</p>
+              <p className="text-[10px] text-gray-400">PDF up to 5MB.</p>
             </div>
           )}
         </div>
@@ -197,17 +314,17 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
       <div className="border-t border-gray-200 p-4">
         <button 
           type="button"
-          disabled={!isFormComplete()}
-          onClick={onTailorStart}
+          disabled={!isFormComplete() || isUploading || isGenerating}
+          onClick={handleTailorResume}
           className={`w-full py-2 rounded-lg shadow-md transition-all text-xs font-medium ${
-            isFormComplete()
+            isFormComplete() && !isUploading && !isGenerating
               ? 'bg-[#4A3AFF] hover:bg-[#4A3AFF]/90 text-white cursor-pointer'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >
-          Tailor My Resume
+          {isUploading ? 'Processing Resume...' : isGenerating ? 'Generating...' : 'Tailor My Resume'}
         </button>
-        {!isFormComplete() && (
+        {!isFormComplete() && !isUploading && !isGenerating && (
           <p className="text-[10px] text-gray-500 text-center mt-2">
             Please {!jobDescription.trim() ? 'enter job description' : ''} 
             {!jobDescription.trim() && !(selectedResume || uploadedFile) ? ' and ' : ''}

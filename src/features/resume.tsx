@@ -15,9 +15,10 @@ import { SignedIn, SignedOut } from "@clerk/chrome-extension";
 
 interface ResumePageProps {
   onBack?: () => void;
+  shareableLink?: string;
 }
 
-const ResumePage: React.FC<ResumePageProps> = ({ onBack }) => {
+const ResumePage: React.FC<ResumePageProps> = ({ onBack, shareableLink }) => {
   return (
     <div className="flex flex-col h-full bg-white">
       {onBack && (
@@ -109,23 +110,31 @@ const ResumePage: React.FC<ResumePageProps> = ({ onBack }) => {
               <FiDownload className="mr-2" />
               Download
             </button>
-            <button
-              onClick={() => alert("Preview triggered")}
-              className="text-xs text-[#4A3AFF] hover:underline"
-            >
-              Preview
-            </button>
+            {shareableLink && (
+              <a
+                href={shareableLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[#4A3AFF] hover:underline"
+              >
+                Preview
+              </a>
+            )}
           </div>
         </SignedIn>
         
         <SignedOut>
           <div className="flex flex-col items-center space-y-2">
-            <button
-              onClick={() => alert("Preview triggered")}
-              className="text-xs text-[#4A3AFF] hover:underline"
-            >
-              Preview
-            </button>
+            {shareableLink && (
+              <a
+                href={shareableLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[#4A3AFF] hover:underline"
+              >
+                Preview
+              </a>
+            )}
           </div>
         </SignedOut>
       </div>
