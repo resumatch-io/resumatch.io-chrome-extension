@@ -5,7 +5,8 @@ chrome.runtime.onInstalled.addListener(() => {
     { id: "find-email", title: "Find E-mail" },
     { id: "find-referrals", title: "Find Referrals" },
     { id: "request-intro", title: "Request Intro" },
-    { id: "capture-screenshot", title: "Capture Screenshot" }
+    { id: "capture-screenshot", title: "Capture Screenshot" },
+    {id:"Tailor My Resume", title:"Tailor My Resume"}
   ]
 
   menuItems.forEach((item) => {
@@ -40,54 +41,40 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         }
       )
       break
+    case "Tailor My Resume":
+      // If text is selected, use it as job description
+      const jobDescription = info.selectionText || "";
+      chrome.tabs.sendMessage(tab.id, {
+        action: "openSidebar",
+        page: "tailor",
+        jobDescription
+      });
+      break
   }
 })
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // resume genearator
-  if (message.action === "GENERATE_RESUME") {
+  // Unified resume generation and saving
+  if (message.action === "GENERATE_AND_SAVE_RESUME") {
     const body = {
       parsedText: message.parsedText || "",
-      jobDescription: message.jobDescription || ""
+      jobDescription: message.jobDescription || "",
+      name: "sample",
+      resumeTemplate: "default"
     }
-    fetch("https://resumatch.io/api/external/generate-resume", {
+    fetch("https://resumatch.io/api/external/generate-and-save-resume", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     })
       .then(res => res.json())
       .then(data => {
-        sendResponse({ success: true, data })
+        sendResponse({ success: true, ...data })
       })
       .catch(error => {
         sendResponse({ success: false, error: error.message })
       })
     return true
-  }
-
-  // Save Resume 
-  if (message.action === "SAVE_RESUME") {
-    const body = {
-      parsedText: message.parsedText ,
-      text: message.text,
-      jobDescription: message.jobDescription ,
-      name: "sai",
-      summary: message.summary,
-      resumeTemplate: "Default"
-    }
-    fetch("https://resumatch.io/api/external/resumes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    })
-      .then(res => res.json())
-      .then(data => {
-        sendResponse({ success: true, data })
-      })
-      .catch(error => {
-        sendResponse({ success: false, error: error.message })
-      })
-    return true 
   }
 })
 

@@ -22,18 +22,19 @@ interface SidebarProps {
   forceVisible?: boolean;
   initialPage?: string;
   capturedScreenshot?: string;
+  jobDescription?: string;
   onClose?: () => void;
   onFileDialogOpen?: () => void;
   onFileDialogClose?: () => void;
 }
 
-export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot: initialCapturedScreenshot, onClose, onFileDialogOpen, onFileDialogClose }: SidebarProps) => {
+export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot: initialCapturedScreenshot, jobDescription: initialJobDescription, onClose, onFileDialogOpen, onFileDialogClose }: SidebarProps) => {
   const [isVisible, setIsVisible] = useState(forceVisible);
   const [currentPage, setCurrentPage] = useState("main");
   const [selectedResume, setSelectedResume] = useState<string | null>(null);
   const [showLoading, setShowLoading] = useState(false);
   const [showResume, setShowResume] = useState(false);
-  const [jobDescription, setJobDescription] = useState('');
+  const [jobDescription, setJobDescription] = useState(initialJobDescription || '');
   const [capturedScreenshot, setCapturedScreenshot] = useState<string | null>(null);
   const [shareableLink, setShareableLink] = useState<string | null>(null);
   const { user } = useUser();
@@ -46,6 +47,14 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
       if (initialCapturedScreenshot) setCapturedScreenshot(initialCapturedScreenshot);
     }
   }, [forceVisible, initialPage, initialCapturedScreenshot]);
+
+  useEffect(() => {
+    if (initialJobDescription !== undefined) {
+      setJobDescription(initialJobDescription);
+      setIsVisible(true);
+      if (initialPage) setCurrentPage(initialPage);
+    }
+  }, [initialJobDescription, initialPage]);
 
   const navItems = [
     {

@@ -9,7 +9,7 @@ export interface ParseResult {
 }
 
 // Set up the PDF.js worker for v3.x (CDN)
-GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js"
+GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("assets/pdf.worker.min.js")
 
 export async function parseDocument(file: File): Promise<ParseResult> {
   try {

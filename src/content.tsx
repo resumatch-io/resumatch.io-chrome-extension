@@ -1,96 +1,60 @@
-import cssText from "data-text:~style.css"
-import type { PlasmoCSConfig } from "plasmo"
-import { ClerkProvider } from "@clerk/chrome-extension"
-import { Sidebar } from "~features/sidebar"
-import { useState, useEffect } from "react"
-
-const PUBLISHABLE_KEY = process.env.PLASMO_PUBLIC_CLERK_PUBLISHABLE_KEY
-
-if (!PUBLISHABLE_KEY) {
-  throw new Error(
-    "Please add the PLASMO_PUBLIC_CLERK_PUBLISHABLE_KEY to the .env.development file"
-  )
-}
-
-export const config: PlasmoCSConfig = {
-  matches: ["<all_urls>"]
-}
-
-export const getStyle = (): HTMLStyleElement => {
-  const baseFontSize = 16
-  let updatedCssText = cssText.replaceAll(":root", ":host(plasmo-csui)")
-  const remRegex = /([\d.]+)rem/g
-  updatedCssText = updatedCssText.replace(remRegex, (match, remValue) => {
-    const pixelsValue = parseFloat(remValue) * baseFontSize
-    return `${pixelsValue}px`
-  })
-  const styleElement = document.createElement("style")
-  styleElement.textContent = updatedCssText
-  return styleElement
-}
-
-const PlasmoOverlay = () => {
-  const [isVisible, setIsVisible] = useState(false)
-  const [messageData, setMessageData] = useState<any>(null)
-
-  useEffect(() => {
-    const messageListener = (message, sender, sendResponse) => {
-      try {
-        if (
-          [
-            "openSidebar",
-            "saveJob",
-            "saveContact",
-            "findEmail",
-            "findReferrals",
-            "requestIntro"
-          ].includes(message.action)
-        ) {
-          setIsVisible(true)
-          setMessageData(message)
-          sendResponse({ status: "success", message: `Action ${message.action} triggered` })
-        }
-      } catch (error) {
-        sendResponse({ status: "error", message: "Error processing message" })
+{
+  "name": "resumatch-extension",
+  "displayName": "Resumatch extension",
+  "version": "0.0.1",
+  "description": "a resumatch",
+  "author": "sai karthik",
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "package": "plasmo package"
+  },
+  "dependencies": {
+    "@clerk/chrome-extension": "^2.5.3",
+    "lucide-react": "^0.525.0",
+    "mammoth": "^1.9.1",
+    "next": "^15.3.5",
+    "pdf-parse": "^1.1.1",
+    "pdf-parser": "^1.0.5",
+    "pdf2json": "^3.1.6",
+    "pdfjs-dist": "3.11.174",
+    "plasmo": "0.90.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-icons": "^5.5.0",
+    "tailwindcss": "3.4.1"
+  },
+  "devDependencies": {
+    "@ianvs/prettier-plugin-sort-imports": "4.1.1",
+    "@types/chrome": "0.0.258",
+    "@types/node": "20.11.5",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/react": "18.2.48",
+    "@types/react-dom": "18.2.18",
+    "postcss": "8.4.33",
+    "prettier": "3.2.4",
+    "typescript": "5.3.3"
+  },
+  "manifest": {
+    "key": "$CRX_PUBLIC_KEY",
+    "permissions": [
+      "cookies",
+      "storage",
+      "tabs",
+      "contextMenus",
+      "activeTab"
+    ],
+    "host_permissions": [
+     "https://resumatch.io/*",
+     "<all_urls>"
+    ],
+    "web_accessible_resources": [
+      {
+        "resources": [
+          "assets/pdf.worker.min.js"
+        ],
+        "matches": ["<all_urls>"]
       }
-    }
-
-    chrome.runtime.onMessage.addListener(messageListener)
-
-    return () => {
-      chrome.runtime.onMessage.removeListener(messageListener)
-    }
-  }, [])
-
-  return (
-    <ClerkProvider
-      publishableKey={PUBLISHABLE_KEY}
-      afterSignOutUrl={window.location.href}
-      signInFallbackRedirectUrl={window.location.href}
-      signUpFallbackRedirectUrl={window.location.href}>
-      {!isVisible && (
-        <div
-          onMouseEnter={() => setIsVisible(true)}
-          className="plasmo-fixed plasmo-top-0 plasmo-right-0 plasmo-h-full plasmo-w-5 plasmo-z-[9998]"
-        />
-      )}
-      <div
-        className={`plasmo-z-50 plasmo-flex plasmo-fixed plasmo-top-32 plasmo-right-8 ${
-          isVisible ? "plasmo-block" : "plasmo-hidden"
-        }`}>
-        <Sidebar
-          initialPage={messageData?.page}
-          capturedScreenshot={messageData?.screenshot}
-          onClose={() => {
-            setIsVisible(false)
-            setMessageData(null)
-          }}
-          onFileDialogOpen={() => {}}
-          onFileDialogClose={() => {}}
-        />
-      </div>
-    </ClerkProvider>
-  )
+    ]
+  }
 }
-
-export default PlasmoOverlay
