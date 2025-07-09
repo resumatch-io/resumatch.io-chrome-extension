@@ -47,6 +47,14 @@
     "host_permissions": [
      "https://resumatch.io/*",
      "<all_urls>"
+    ],
+    "web_accessible_resources": [
+      {
+        "resources": [
+          "pdf.worker.min.js"
+        ],
+        "matches": ["<all_urls>"]
+      }
     ]
   }
 }

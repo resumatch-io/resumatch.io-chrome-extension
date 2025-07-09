@@ -1,3 +1,5 @@
+import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/build/pdf";
+
 chrome.runtime.onInstalled.addListener(() => {
   const menuItems = [
     { id: "save-job", title: "Save Job" },
@@ -42,16 +44,21 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       )
       break
     case "Tailor My Resume":
-      // If text is selected, use it as job description
-      const jobDescription = info.selectionText || "";
-      chrome.tabs.sendMessage(tab.id, {
-        action: "openSidebar",
-        page: "tailor",
-        jobDescription
+      // Always request the selected text from the content script
+      chrome.tabs.sendMessage(tab.id, { action: "getSelectedText" }, (response) => {
+        const jobDescription = response?.selectedText || "";
+        chrome.tabs.sendMessage(tab.id, {
+          action: "openSidebar",
+          page: "tailor",
+          jobDescription
+        });
       });
       break
   }
 })
+
+// Set the workerSrc for pdfjs-dist
+GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.min.js")
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Unified resume generation and saving
@@ -75,6 +82,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message })
       })
     return true
+  }
+
+  // PDF parsing in background
+  if (message.action === "PARSE_PDF" && message.pdfData) {
+    (async () => {
+      try {
+        // Accepts base64 or ArrayBuffer
+        let data;
+        if (typeof message.pdfData === "string") {
+          // base64 string
+          data = Uint8Array.from(atob(message.pdfData), c => c.charCodeAt(0));
+        } else {
+          // ArrayBuffer
+          data = new Uint8Array(message.pdfData);
+        }
+        const pdf = await getDocument({ data }).promise;
+        let text = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          text += content.items.map(item => item.str).join(" ") + "\n";
+        }
+        sendResponse({ success: true, text });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true; // async response
   }
 })
 

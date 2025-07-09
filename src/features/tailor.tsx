@@ -1,8 +1,13 @@
 import React, { useState, useRef } from 'react'
 import { Upload, CheckCircle, Loader2 } from 'lucide-react'
 import { SignedIn, SignedOut } from "@clerk/chrome-extension"
-import { parseDocument } from '../api/parse'
-import type { ParseResult } from '../api/parse'
+
+// Define ParseResult type locally
+interface ParseResult {
+  fileName: string;
+  parsedText: string;
+  error?: string;
+}
 
 interface TailorResumePageProps {
   onSelectFromCollections?: () => void
@@ -48,17 +53,36 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     return true
   }
 
-  const parseDocumentLocal = async (file: File) => {
+  // Replace parseDocumentLocal to use background script
+  const parseDocumentLocal = async (file: File): Promise<ParseResult> => {
     try {
-      const result = await parseDocument(file)
-      return result
+      // Read file as ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            action: "PARSE_PDF",
+            pdfData: arrayBuffer
+          },
+          (response) => {
+            if (response?.success) {
+              resolve({ fileName: file.name, parsedText: response.text });
+            } else {
+              resolve({
+                fileName: file.name,
+                parsedText: `File processing failed for ${file.name}. Error: ${response?.error || 'Unknown error'}. Please try with a different file.`,
+                error: response?.error || 'Unknown error'
+              });
+            }
+          }
+        );
+      });
     } catch (error) {
-      const fallbackResult: ParseResult = {
+      return {
         fileName: file.name,
         parsedText: `File processing failed for ${file.name}. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try with a different file.`,
         error: error instanceof Error ? error.message : 'Unknown error'
-      }
-      return fallbackResult
+      };
     }
   }
 
