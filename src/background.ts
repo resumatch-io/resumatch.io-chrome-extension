@@ -36,10 +36,19 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         tab.windowId,
         { format: "png" },
         (image) => {
-          const message = image 
-            ? { action: "openSidebar", page: "screenshot", screenshot: image }
-            : { action: "openSidebar", page: "screenshot", error: "Failed to capture screenshot" }
-          chrome.tabs.sendMessage(tab.id, message)
+          if (image) {
+            chrome.tabs.sendMessage(tab.id, {
+              action: "openSidebar",
+              page: "screenshot",
+              screenshot: image
+            })
+          } else {
+            chrome.tabs.sendMessage(tab.id, {
+              action: "openSidebar",
+              page: "screenshot",
+              error: "Failed to capture screenshot"
+            })
+          }
         }
       )
       break
@@ -110,6 +119,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     })();
     return true; // async response
+  }
+
+  // Custom region screenshot
+  if (message.action === "captureRegionScreenshot" && message.rect) {
+    chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: "png" }, (image) => {
+      if (!image) {
+        sendResponse({ status: "error", message: "Failed to capture screenshot" });
+        return;
+      }
+      // Just send the full screenshot back; cropping will be done in the content script
+      sendResponse({ status: "success", screenshot: image, rect: message.rect });
+    });
+    return true;
+  }
+
+  // Full screenshot capture
+  if (message.action === "captureScreenshot") {
+    // Try to get the sender's tab/window
+    let windowId = sender.tab ? sender.tab.windowId : undefined;
+    chrome.tabs.captureVisibleTab(windowId, { format: "png" }, (image) => {
+      if (!image) {
+        sendResponse({ status: "error", message: "Failed to capture screenshot" });
+        return;
+      }
+      sendResponse({ status: "success", screenshot: image });
+    });
+    return true;
+  }
+
+  // Relay startCustomScreenshot from sidebar to content script in active tab
+  if (message.action === "startCustomScreenshot") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(
+          tabs[0].id,
+          { action: "startCustomScreenshot" },
+          (response) => {
+            sendResponse(response);
+          }
+        );
+      } else {
+        sendResponse({ status: "error", message: "No active tab found." });
+      }
+    });
+    return true; // keep channel open for async response
   }
 })
 

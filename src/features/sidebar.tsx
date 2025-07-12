@@ -30,6 +30,7 @@ interface SidebarProps {
 
 export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot: initialCapturedScreenshot, jobDescription: initialJobDescription, onClose, onFileDialogOpen, onFileDialogClose }: SidebarProps) => {
   const [isVisible, setIsVisible] = useState(forceVisible);
+  const [snipping, setSnipping] = useState(false);
   const [currentPage, setCurrentPage] = useState("main");
   const [selectedResume, setSelectedResume] = useState<string | null>(null);
   const [showLoading, setShowLoading] = useState(false);
@@ -44,7 +45,10 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
     if (forceVisible) {
       setIsVisible(true);
       if (initialPage) setCurrentPage(initialPage);
-      if (initialCapturedScreenshot) setCapturedScreenshot(initialCapturedScreenshot);
+      if (initialCapturedScreenshot) {
+        setCapturedScreenshot(initialCapturedScreenshot);
+        console.log("[Sidebar] initialCapturedScreenshot received:", initialCapturedScreenshot);
+      }
     }
   }, [forceVisible, initialPage, initialCapturedScreenshot]);
 
@@ -55,6 +59,38 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
       if (initialPage) setCurrentPage(initialPage);
     }
   }, [initialJobDescription, initialPage]);
+
+  // Always update screenshot and show sidebar when initialCapturedScreenshot changes
+  useEffect(() => {
+    if (initialCapturedScreenshot) {
+      setCapturedScreenshot(initialCapturedScreenshot);
+      setCurrentPage("screenshot");
+      setIsVisible(true);
+      console.log("[Sidebar] (effect) Showing sidebar with new screenshot:", initialCapturedScreenshot);
+    }
+  }, [initialCapturedScreenshot]);
+
+  // Listen for snipping events from content script
+  useEffect(() => {
+    function handleSnippingMessage(message) {
+      if (message && message.action === "snippingStart") {
+        setSnipping(true);          // hide sidebar content
+        setIsVisible(false);        // 🔧 this fully closes it
+        console.log("[Sidebar] Snipping started, closing sidebar");
+      }
+      if (message && message.action === "snippingEnd") {
+        setSnipping(false);
+        setIsVisible(true);         // show again
+        setCurrentPage("screenshot");
+        if (message.screenshot) {
+          setCapturedScreenshot(message.screenshot);
+        }
+        console.log("[Sidebar] Snipping ended, showing sidebar with screenshot");
+      }
+    }
+    chrome.runtime.onMessage.addListener(handleSnippingMessage);
+    return () => chrome.runtime.onMessage.removeListener(handleSnippingMessage);
+  }, []);
 
   const navItems = [
     {
@@ -147,30 +183,36 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
     if (onClose) onClose();
   };
 
+  if (currentPage === "screenshot") {
+    console.log("[Sidebar] Passing initialScreenshot to Screenshot:", capturedScreenshot);
+  }
+
   return (
     <>
       {/* Hover Trigger */}
-      <div
-        className="fixed top-1/2 right-0 w-8 h-32 -translate-y-1/2 z-[999998] bg-[#4A3AFF] hover:bg-blue-400 text-white text-xs font-mono font-bold cursor-pointer flex items-center justify-center transition-all duration-300 rounded-l-lg max-sm:w-6 max-sm:h-24"
-        onMouseEnter={() => setIsVisible(true)}
-        style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
-      >
-        {!isVisible && (
-          <>
-            <img
-              src={resumatchLogo}
-              alt="Resumatch Logo"
-              className="w-6 h-6 bg-white p-1 rounded rotate-90 max-sm:w-4 max-sm:h-4"
-            />
-            <p className="p-1 max-sm:text-[10px]">ResuMatch</p>
-          </>
-        )}
-      </div>
+      {!snipping && (
+        <div
+          className="fixed top-1/2 right-0 w-8 h-32 -translate-y-1/2 z-[999998] bg-[#4A3AFF] hover:bg-blue-400 text-white text-xs font-mono font-bold cursor-pointer flex items-center justify-center transition-all duration-300 rounded-l-lg max-sm:w-6 max-sm:h-24"
+          onMouseEnter={() => setIsVisible(true)}
+          style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+        >
+          {!isVisible && (
+            <>
+              <img
+                src={resumatchLogo}
+                alt="Resumatch Logo"
+                className="w-6 h-6 bg-white p-1 rounded rotate-90 max-sm:w-4 max-sm:h-4"
+              />
+              <p className="p-1 max-sm:text-[10px]">ResuMatch</p>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Sidebar Content */}
       {(isVisible || forceVisible) && (
         <div
-          className="fixed top-5 right-5 bottom-5 w-[400px] max-w-[90vw] z-[999999] bg-white rounded-2xl shadow-2xl border border-gray-200 font-sans animate-slide-in-right flex flex-col overflow-hidden"
+          className={`fixed top-5 right-5 bottom-5 w-[400px] max-w-[90vw] z-[999999] bg-white rounded-2xl shadow-2xl border border-gray-200 font-sans animate-slide-in-right flex flex-col overflow-hidden ${snipping ? 'opacity-30 pointer-events-none' : ''}`}
         >
           <button
             onClick={handleClose}

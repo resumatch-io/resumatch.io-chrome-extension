@@ -4,6 +4,13 @@ import { ClerkProvider } from "@clerk/chrome-extension"
 import { Sidebar } from "~features/sidebar"
 import { useState, useEffect } from "react"
 
+declare global {
+  interface Window {
+    setResumatchSidebarVisible?: (visible: boolean) => void;
+    setResumatchSidebarMessageData?: (data: any) => void;
+  }
+}
+
 const PUBLISHABLE_KEY = process.env.PLASMO_PUBLIC_CLERK_PUBLISHABLE_KEY
 
 if (!PUBLISHABLE_KEY) {
@@ -29,9 +36,22 @@ export const getStyle = (): HTMLStyleElement => {
   return styleElement
 }
 
+// Listen for sidebar control messages
+// Remove all mountSidebar/unmountSidebar and sidebarRoot logic
+// Remove Sidebar mounting root, mountSidebar, unmountSidebar, and related chrome.runtime.onMessage.addListener
+// Replace with only React state logic in PlasmoOverlay
 const PlasmoOverlay = () => {
   const [isVisible, setIsVisible] = useState(false)
   const [messageData, setMessageData] = useState<any>(null)
+
+  useEffect(() => {
+    window.setResumatchSidebarVisible = setIsVisible;
+    window.setResumatchSidebarMessageData = setMessageData;
+    return () => {
+      delete window.setResumatchSidebarVisible;
+      delete window.setResumatchSidebarMessageData;
+    };
+  }, [setIsVisible, setMessageData]);
 
   useEffect(() => {
     const messageListener = (message, sender, sendResponse) => {
@@ -51,9 +71,153 @@ const PlasmoOverlay = () => {
             "requestIntro"
           ].includes(message.action)
         ) {
+          console.log("[Sidebar] openSidebar message received", message)
           setIsVisible(true)
           setMessageData(message)
+          console.log("[Sidebar] Sidebar set to visible, messageData:", message)
           sendResponse({ status: "success", message: `Action ${message.action} triggered` })
+        }
+        // Custom screenshot region selection
+        if (message.action === "startCustomScreenshot") {
+          console.log("[Snip] startCustomScreenshot received");
+          // Hide sidebar
+          setIsVisible(false);
+          setMessageData(null);
+          // Remove any existing snip overlay
+          const existingHost = document.getElementById("snip-shadow-host");
+          if (existingHost) existingHost.remove();
+          // Create shadow host
+          const host = document.createElement("div");
+          host.id = "snip-shadow-host";
+          host.style.position = "fixed";
+          host.style.top = "0";
+          host.style.left = "0";
+          host.style.width = "100vw";
+          host.style.height = "100vh";
+          host.style.zIndex = "2147483647";
+          host.style.pointerEvents = "auto";
+          document.body.appendChild(host);
+          const shadow = host.attachShadow({ mode: "open" });
+          // Add overlay style
+          const style = document.createElement("style");
+          style.textContent = `
+            .snip-overlay {
+              position: fixed;
+              top: 0; left: 0; width: 100vw; height: 100vh;
+              background: rgba(0,0,0,0.2);
+              cursor: crosshair;
+              user-select: none;
+            }
+            .snip-selection {
+              position: fixed;
+              border: 2px dashed #4A3AFF;
+              background: rgba(74,58,255,0.15);
+              pointer-events: none;
+            }
+          `;
+          shadow.appendChild(style);
+          // Create overlay
+          const overlay = document.createElement("div");
+          overlay.className = "snip-overlay";
+          shadow.appendChild(overlay);
+          // Selection box
+          const selectionBox = document.createElement("div");
+          selectionBox.className = "snip-selection";
+          selectionBox.style.display = "none";
+          shadow.appendChild(selectionBox);
+          // Mouse logic
+          let startX = 0, startY = 0, endX = 0, endY = 0, isSelecting = false;
+          overlay.addEventListener("mousedown", (e) => {
+            isSelecting = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            selectionBox.style.display = "block";
+            selectionBox.style.left = `${startX}px`;
+            selectionBox.style.top = `${startY}px`;
+            selectionBox.style.width = "0px";
+            selectionBox.style.height = "0px";
+          });
+          overlay.addEventListener("mousemove", (e) => {
+            if (!isSelecting) return;
+            endX = e.clientX;
+            endY = e.clientY;
+            const left = Math.min(startX, endX);
+            const top = Math.min(startY, endY);
+            const width = Math.abs(endX - startX);
+            const height = Math.abs(endY - startY);
+            selectionBox.style.left = `${left}px`;
+            selectionBox.style.top = `${top}px`;
+            selectionBox.style.width = `${width}px`;
+            selectionBox.style.height = `${height}px`;
+          });
+          overlay.addEventListener("mouseup", (e) => {
+            isSelecting = false;
+            selectionBox.style.display = "none";
+            host.remove();
+            // Show sidebar again with screenshot page
+            setIsVisible(true);
+            setMessageData({ initialPage: "screenshot" });
+            // Calculate crop region with scroll and device pixel ratio
+            const dpr = window.devicePixelRatio || 1;
+            const scrollX = window.scrollX;
+            const scrollY = window.scrollY;
+            const cropX = (Math.min(startX, endX) + scrollX) * dpr;
+            const cropY = (Math.min(startY, endY) + scrollY) * dpr;
+            const cropWidth = Math.abs(endX - startX) * dpr;
+            const cropHeight = Math.abs(endY - startY) * dpr;
+            const rect = {
+              x: cropX,
+              y: cropY,
+              width: cropWidth,
+              height: cropHeight
+            };
+            console.log("[Snip] Mouse up. Final rect:", rect);
+            if (rect.width < 5 || rect.height < 5) {
+              sendResponse({ status: "error", message: "Selection too small" });
+              return;
+            }
+            chrome.runtime.sendMessage({ action: "captureRegionScreenshot", rect }, (response) => {
+              if (response.status === "success" && response.screenshot) {
+                // Crop the image in the content script
+                const img = new window.Image();
+                img.onload = function () {
+                  const canvas = document.createElement("canvas");
+                  canvas.width = rect.width;
+                  canvas.height = rect.height;
+                  const ctx = canvas.getContext("2d");
+                  ctx.drawImage(
+                    img,
+                    rect.x,
+                    rect.y,
+                    rect.width,
+                    rect.height,
+                    0,
+                    0,
+                    rect.width,
+                    rect.height
+                  );
+                  const cropped = canvas.toDataURL("image/png");
+                  sendResponse({ status: "success", screenshot: cropped });
+                };
+                img.onerror = function () {
+                  sendResponse({ status: "error", message: "Failed to process screenshot" });
+                };
+                img.src = response.screenshot;
+              } else {
+                sendResponse({ status: "error", message: response.message || "Failed to capture screenshot" });
+              }
+            });
+          });
+          return true;
+        }
+        // Handle snippingStart and snippingEnd from background/messages
+        if (message.action === "snippingStart") {
+          setIsVisible(false);
+          setMessageData(null);
+        }
+        if (message.action === "snippingEnd") {
+          setIsVisible(true);
+          setMessageData({ initialPage: "screenshot", capturedScreenshot: message.screenshot });
         }
       } catch (error) {
         sendResponse({ status: "error", message: "Error processing message" })
@@ -84,8 +248,8 @@ const PlasmoOverlay = () => {
           isVisible ? "plasmo-block" : "plasmo-hidden"
         }`}>
         <Sidebar
-          initialPage={messageData?.page}
-          capturedScreenshot={messageData?.screenshot}
+          initialPage={messageData?.page || messageData?.initialPage}
+          capturedScreenshot={messageData?.screenshot || messageData?.capturedScreenshot}
           jobDescription={messageData?.jobDescription}
           onClose={() => {
             setIsVisible(false)

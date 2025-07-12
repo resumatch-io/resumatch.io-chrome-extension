@@ -162,10 +162,10 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           resumeTemplate: 'default'
         },
         (response) => {
-          setIsGenerating(false)
+                setIsGenerating(false)
           if (response?.success && response.resumeId) {
             const link = `https://resumatch.io/share/${response.resumeId}`;
-            if (onTailorStart) onTailorStart(link)
+                  if (onTailorStart) onTailorStart(link)
           } else {
             alert('There was an error generating and saving your tailored resume.')
           }
