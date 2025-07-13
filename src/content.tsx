@@ -197,6 +197,9 @@ const PlasmoOverlay = () => {
                     rect.height
                   );
                   const cropped = canvas.toDataURL("image/png");
+                  // Open sidebar and show screenshot
+                  window.setResumatchSidebarVisible?.(true);
+                  window.setResumatchSidebarMessageData?.({ initialPage: "screenshot", capturedScreenshot: cropped });
                   sendResponse({ status: "success", screenshot: cropped });
                 };
                 img.onerror = function () {
@@ -211,14 +214,6 @@ const PlasmoOverlay = () => {
           return true;
         }
         // Handle snippingStart and snippingEnd from background/messages
-        if (message.action === "snippingStart") {
-          setIsVisible(false);
-          setMessageData(null);
-        }
-        if (message.action === "snippingEnd") {
-          setIsVisible(true);
-          setMessageData({ initialPage: "screenshot", capturedScreenshot: message.screenshot });
-        }
       } catch (error) {
         sendResponse({ status: "error", message: "Error processing message" })
       }

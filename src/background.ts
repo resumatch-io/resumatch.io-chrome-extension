@@ -32,25 +32,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       chrome.tabs.sendMessage(tab.id, { action: info.menuItemId })
       break
     case "capture-screenshot":
-      chrome.tabs.captureVisibleTab(
-        tab.windowId,
-        { format: "png" },
-        (image) => {
-          if (image) {
-            chrome.tabs.sendMessage(tab.id, {
-              action: "openSidebar",
-              page: "screenshot",
-              screenshot: image
-            })
-          } else {
-            chrome.tabs.sendMessage(tab.id, {
-              action: "openSidebar",
-              page: "screenshot",
-              error: "Failed to capture screenshot"
-            })
-          }
-        }
-      )
+      chrome.tabs.sendMessage(tab.id, { action: "startCustomScreenshot" });
       break
     case "Tailor My Resume":
       // Always request the selected text from the content script

@@ -212,7 +212,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
       {/* Sidebar Content */}
       {(isVisible || forceVisible) && (
         <div
-          className={`fixed top-5 right-5 bottom-5 w-[400px] max-w-[90vw] z-[999999] bg-white rounded-2xl shadow-2xl border border-gray-200 font-sans animate-slide-in-right flex flex-col overflow-hidden ${snipping ? 'opacity-30 pointer-events-none' : ''}`}
+          className={`fixed top-5 right-5 bottom-5 w-[400px] max-w-[90vw] z-[999999] bg-white rounded-2xl shadow-2xl border border-gray-200 font-sans animate-slide-in-right flex flex-col overflow-hidden ${snipping ? 'opacity-0 pointer-events-none' : ''}`}
         >
           <button
             onClick={handleClose}
