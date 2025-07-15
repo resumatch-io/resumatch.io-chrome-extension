@@ -147,5 +147,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true; // keep channel open for async response
   }
+
+  // Resume generator
+  if (message.action === "GENERATE_RESUME") {
+    const body = {
+      parsedText: message.parsedText || "",
+      jobDescription: message.jobDescription || ""
+    }
+    fetch("https://resumatch.io/api/external/generate-resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(res => res.json())
+      .then(data => {
+        sendResponse({ success: true, data })
+      })
+      .catch(error => {
+        sendResponse({ success: false, error: error.message })
+      })
+    return true
+  }
+
+  // Save Resume 
+  if (message.action === "SAVE_RESUME") {
+    const body = {
+      parsedText: message.parsedText ,
+      text: message.text,
+      jobDescription: message.jobDescription ,
+      name: "sai",
+      summary: message.summary,
+      resumeTemplate: "Default"
+    }
+    fetch("https://resumatch.io/api/external/resumes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(res => res.json())
+      .then(data => {
+        sendResponse({ success: true, data })
+      })
+      .catch(error => {
+        sendResponse({ success: false, error: error.message })
+      })
+    return true 
+  }
 })
 

@@ -155,19 +155,38 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     try {
       chrome.runtime.sendMessage(
         {
-          action: 'GENERATE_AND_SAVE_RESUME',
+          action: 'GENERATE_RESUME',
           parsedText,
-          jobDescription,
-          name: 'sample',
-          resumeTemplate: 'default'
+          jobDescription
         },
         (response) => {
+          if (response?.success && response.data?.resume) {
+            const summary = Array.isArray(response.data.resume.summary) && response.data.resume.summary.length > 0
+              ? response.data.resume.summary[0]
+              : '';
+            console.log(response.data.resume);
+            chrome.runtime.sendMessage(
+              {
+                action: 'SAVE_RESUME',
+                parsedText,
+                text: response.data.resume,
+                jobDescription,
+                summary,
+                resumeTemplate: 'Default'
+              },
+              (saveResponse) => {
                 setIsGenerating(false)
-          if (response?.success && response.resumeId) {
-            const link = `https://resumatch.io/share/${response.resumeId}`;
+                if (saveResponse?.success && saveResponse.data?.resumeId) {
+                  const link = `https://resumatch.io/share/${saveResponse.data.resumeId}`;
                   if (onTailorStart) onTailorStart(link)
+                } else {
+                  alert('There was an error saving your tailored resume.')
+                }
+              }
+            )
           } else {
-            alert('There was an error generating and saving your tailored resume.')
+            setIsGenerating(false)
+            alert('There was an error generating your tailored resume.')
           }
         }
       )
