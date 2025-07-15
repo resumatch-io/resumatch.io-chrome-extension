@@ -12,11 +12,12 @@ import tailorIcon from "data-base64:../../assets/tailor-icon.svg";
 import GoogleLogo from "data-base64:../../assets/google-logo.svg";
 import docSignGif from "data-base64:../../assets/doc-sign.gif";
 import Upload from "data-base64:../../assets/screenshot.svg";
-import { FiArrowLeft, FiLogOut, FiX } from "react-icons/fi";
+import { FiArrowLeft, FiLogOut, FiX, FiUpload, FiPackage } from "react-icons/fi";
 import TailorResumePage from "./tailor";
 import SelectResumePage from "./select";
 import ResumePage from "./resume";
 import Screenshot from "./screenshot";
+import Collections from "../pages/collections";
 
 interface SidebarProps {
   forceVisible?: boolean;
@@ -74,13 +75,22 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
       title: "Tailor My Resume",
       description: "Tailor my resume according to the job description or resumes.",
       icon: <img src={tailorIcon} alt="Tailor Icon" className="w-10 h-10" />,
-      action: "tailorResume"
+      action: "tailorResume",
+      visibleTo: "all"
     },
     {
-      title:"Upload JD screenshot",
+      title: "Upload JD screenshot",
       description: "Upload a screenshot of the job description to tailor your resume.",
       icon: <img src={Upload} alt="Upload Icon" className="w-10 h-10" />,
-      action: "uploadScreenshot" 
+      action: "uploadScreenshot",
+      visibleTo: "signedIn"
+    },
+    {
+      title: "Collections",
+      description: "View your collections of tailored resumes.",
+      icon: <FiPackage className="w-10 h-10 text-[#4A3AFF]" />,
+      action: "collections",
+      visibleTo: "signedIn"
     }
   ];
 
@@ -99,6 +109,8 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
       setCurrentPage("select");
     } else if (action === "uploadScreenshot") {
       setCurrentPage("screenshot");
+    } else if (action === "collections") {
+      setCurrentPage("collections");
     }
   };
 
@@ -163,6 +175,9 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
   if (currentPage === "screenshot") {
     console.log("[Sidebar] Passing initialScreenshot to Screenshot:", capturedScreenshot);
   }
+
+  // Apply consistent styles to navigation items
+  const navItemStyle = "flex items-center space-x-3 px-5 py-3 bg-white text-blue-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition duration-200 ease-in-out text-sm font-medium shadow-sm hover:shadow-md";
 
   return (
     <>
@@ -246,6 +261,8 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                   />
                 </div>
               </>
+            ) : currentPage === "collections" ? (
+              <Collections />
             ) : (
               <>
                 <div className="bg-[#4A3AFF] flex justify-center items-center h-[150px] relative">
@@ -261,7 +278,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                   </div>
                   <div className="absolute top-4 right-4">
                     <SignedOut>
-                      
+
                     </SignedOut>
                   </div>
                 </div>
@@ -294,36 +311,37 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                         )}
                       </SignedIn>
 
-                      {navItems.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start space-x-3 bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer hover:border-[#4A3AFF]"
-                          onClick={() => handleNavigation(item.action)}
-                        >
-                          <div className="flex items-center justify-center">
-                            {item.icon}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-base text-[#6366F1]">
-                              {item.title}
+                      {navItems
+                        .filter((item) => {
+                          if (item.visibleTo === "all") return true;
+                          if (item.visibleTo === "signedIn") return !!user;
+                          return false;
+                        })
+                        .map((item, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start space-x-3 bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer hover:border-[#4A3AFF]"
+                            onClick={() => handleNavigation(item.action)}
+                          >
+                            <div className="flex items-center justify-center">
+                              {item.icon}
                             </div>
-                            <div className="text-sm text-gray-600">
-                              {item.description}
+                            <div>
+                              <div className="font-semibold text-base text-[#6366F1]">
+                                {item.title}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {item.description}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
 
                       <SignedIn>
-                        <div className="flex justify-center">
-                          <button
-                            onClick={handleSignOut}
-                            className="flex items-center space-x-2 px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
-                          >
-                            <FiLogOut className="text-sm" />
-                            <span>Sign Out</span>
-                          </button>
-                        </div>
+                        <button className={navItemStyle} onClick={handleSignOut}>
+                          <FiLogOut className="text-base" />
+                          <span>Sign Out</span>
+                        </button>
                       </SignedIn>
                     </div>
                   </div>

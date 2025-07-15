@@ -193,5 +193,52 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
     return true 
   }
+
+  // Fetch Collections
+  if (message.action === "FETCH_COLLECTIONS") {
+    const body = {
+      email: message.email
+    }
+    fetch("https://resumatch.io/api/external/collections", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body)
+    })
+      .then(res => {
+        console.log("Collections API response status:", res.status);
+        console.log("Collections API response headers:", res.headers);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        // Check if response has content
+        return res.text().then(text => {
+          console.log("Collections API raw response:", text);
+          
+          if (!text || text.trim() === '') {
+            throw new Error("Empty response from server");
+          }
+          
+          try {
+            return JSON.parse(text);
+          } catch (e) {
+            console.error("Failed to parse JSON:", e);
+            throw new Error(`Invalid JSON response: ${text.substring(0, 100)}...`);
+          }
+        });
+      })
+      .then(data => {
+        console.log("Collections API parsed data:", data);
+        sendResponse({ success: true, data })
+      })
+      .catch(error => {
+        console.error("Collections API error:", error);
+        sendResponse({ success: false, error: error.message })
+      })
+    return true
+  }
 })
 
