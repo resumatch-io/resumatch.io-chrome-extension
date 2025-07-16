@@ -18,6 +18,6 @@ resumatch-extension/
 ├── .env                    # Environment variables
 ├── package.json           # Dependencies and scripts
 ├── tailwind.config.js     # TailwindCSS configuration
-├── tsconfig.json          # TypeScript configuration
+
 
 ```
