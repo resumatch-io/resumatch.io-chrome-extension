@@ -25,7 +25,7 @@ const ResumePage: React.FC<ResumePageProps> = ({ onBack, shareableLink }) => {
         <div className="p-4">
           <button
             onClick={onBack}
-            className="flex items-center text-xs font-medium text-gray-600 hover:text-[#4A3AFF]"
+            className="flex items-center text-xs font-medium text-gray-600 hover:text-[#4747E1]"
           >
             <FiArrowLeft className="mr-1" />
             Back to Editor
@@ -45,26 +45,26 @@ const ResumePage: React.FC<ResumePageProps> = ({ onBack, shareableLink }) => {
             </button>
 
             <button className="w-10 h-10 rounded-xl bg-[#F3F3FF] flex items-center justify-center">
-              <Trash2 className="w-4 h-4 text-[#4A3AFF]" />
+              <Trash2 className="w-4 h-4 text-[#4747E1]" />
             </button>
 
             <button className="w-10 h-10 rounded-xl bg-[#F3F3FF] flex items-center justify-center">
-              <FileSignature className="w-4 h-4 text-[#4A3AFF]" />
+              <FileSignature className="w-4 h-4 text-[#4747E1]" />
             </button>
 
             <button className="w-10 h-10 rounded-xl bg-[#F3F3FF] flex items-center justify-center">
-              <Pencil className="w-4 h-4 text-[#4A3AFF]" />
+              <Pencil className="w-4 h-4 text-[#4747E1]" />
             </button>
 
             <button className="w-10 h-10 rounded-xl bg-[#F3F3FF] flex items-center justify-center">
-              <SiGoogledrive className="w-4 h-4 text-[#4A3AFF]" />
+              <SiGoogledrive className="w-4 h-4 text-[#4747E1]" />
             </button>
 
             <button className="w-10 h-10 rounded-xl bg-[#F3F3FF] flex items-center justify-center">
-              <Download className="w-4 h-4 text-[#4A3AFF]" />
+              <Download className="w-4 h-4 text-[#4747E1]" />
             </button>
 
-            <button className="px-4 py-2 bg-[#4A3AFF] text-white rounded-md text-xs font-medium shadow hover:bg-[#3a2aff] transition">
+            <button className="px-4 py-2 bg-[#4747E1] text-white rounded-md text-xs font-medium shadow hover:bg-[#3a2aff] transition">
               <div className="flex items-center space-x-1">
                 <LayoutGrid className="w-3.5 h-3.5" />
                 <span>Templates</span>
@@ -96,7 +96,7 @@ const ResumePage: React.FC<ResumePageProps> = ({ onBack, shareableLink }) => {
             <p className="text-sm font-medium text-gray-800">My Resume</p>
             <p className="text-xs text-gray-500">Created on 10-Jan-2024</p>
           </div>
-          <div className="bg-[#4A3AFF] p-2 rounded-lg">
+          <div className="bg-[#4747E1] p-2 rounded-lg">
             <img src={docIcon} alt="Document" className="w-5 h-5" />
           </div>
         </div>
@@ -105,7 +105,7 @@ const ResumePage: React.FC<ResumePageProps> = ({ onBack, shareableLink }) => {
           <div className="flex flex-col items-center space-y-2">
             <button
               onClick={() => alert("Download triggered")}
-              className="flex items-center justify-center px-6 py-2 bg-[#4A3AFF] text-white rounded-full text-sm font-medium shadow hover:bg-[#3a2aff] transition"
+              className="flex items-center justify-center px-6 py-2 bg-[#4747E1] text-white rounded-full text-sm font-medium shadow hover:bg-[#3a2aff] transition"
             >
               <FiDownload className="mr-2" />
               Download
@@ -115,7 +115,7 @@ const ResumePage: React.FC<ResumePageProps> = ({ onBack, shareableLink }) => {
                 href={shareableLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-[#4A3AFF] hover:underline"
+                className="text-xs text-[#4747E1] hover:underline"
               >
                 Preview
               </a>
@@ -130,7 +130,7 @@ const ResumePage: React.FC<ResumePageProps> = ({ onBack, shareableLink }) => {
                 href={shareableLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-[#4A3AFF] hover:underline"
+                className="text-xs text-[#4747E1] hover:underline"
               >
                 Preview
               </a>

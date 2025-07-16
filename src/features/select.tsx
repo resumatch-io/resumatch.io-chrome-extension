@@ -52,7 +52,7 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
               onClick={() => setSelectedFilter(filter)}
               className={`px-2 py-1 rounded-full text-xs  ${
                 selectedFilter === filter
-                  ? 'bg-[#4A3AFF] text-white'
+                  ? 'bg-[#4747E1] text-white'
                   : 'bg-gray-100 text-gray-700'
               }`}
             >
@@ -69,8 +69,8 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
           <div 
             className={`border-2 rounded-lg p-3 bg-white shadow-sm cursor-pointer transition-all ${
               selectedResumeId === 'my-resume' 
-                ? 'border-[#4A3AFF] bg-[#4A3AFF]/5' 
-                : 'border hover:border-[#4A3AFF]'
+                ? 'border-[#4747E1] bg-[#4747E1]/5' 
+                : 'border hover:border-[#4747E1]'
             }`}
             onClick={() => handleResumeClick('My Resume', 'my-resume')}
           >
@@ -78,19 +78,19 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
               <h3 className="text-xs font-semibold text-gray-800">My Resume</h3>
               <div className="flex gap-1">
                 <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Star className="w-3 h-3 text-[#4A3AFF]" />
+                  <Star className="w-3 h-3 text-[#4747E1]" />
                 </div>
                 <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Copy className="w-3 h-3 text-[#4A3AFF]" />
+                  <Copy className="w-3 h-3 text-[#4747E1]" />
                 </div>
                 <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Edit2 className="w-3 h-3 text-[#4A3AFF]" />
+                  <Edit2 className="w-3 h-3 text-[#4747E1]" />
                 </div>
                 <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Download className="w-3 h-3 text-[#4A3AFF]" />
+                  <Download className="w-3 h-3 text-[#4747E1]" />
                 </div>
                 <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Trash2 className="w-3 h-3 text-[#4A3AFF]" />
+                  <Trash2 className="w-3 h-3 text-[#4747E1]" />
                 </div>
               </div>
             </div>
@@ -103,7 +103,7 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
             </div>
             <div className="flex justify-between items-center text-[10px] text-gray-500">
               <span>Created on 10-Jan-2024</span>
-              <span className="bg-[#4A3AFF] text-white text-[9px] px-2 py-1 rounded-full">Resume</span>
+              <span className="bg-[#4747E1] text-white text-[9px] px-2 py-1 rounded-full">Resume</span>
             </div>
           </div>
 
@@ -112,8 +112,8 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
               key={index}
               className={`border rounded-lg p-3 bg-white shadow-sm cursor-pointer transition-all ${
                 selectedResumeId === `resume-${index}` 
-                  ? 'border-[#4A3AFF] bg-[#4A3AFF]/5 border-2' 
-                  : 'border-gray-200 hover:border-[#4A3AFF]'
+                  ? 'border-[#4747E1] bg-[#4747E1]/5 border-2' 
+                  : 'border-gray-200 hover:border-[#4747E1]'
               }`}
               onClick={() => handleResumeClick(item.title, `resume-${index}`)}
             >
@@ -121,19 +121,19 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
                 <h3 className="text-xs font-semibold text-gray-800">{item.title}</h3>
                 <div className="flex gap-1">
                   <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Star className="w-3 h-3 text-[#4A3AFF]" />
+                    <Star className="w-3 h-3 text-[#4747E1]" />
                   </div>
                   <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Copy className="w-3 h-3 text-[#4A3AFF]" />
+                    <Copy className="w-3 h-3 text-[#4747E1]" />
                   </div>
                   <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Edit2 className="w-3 h-3 text-[#4A3AFF]" />
+                    <Edit2 className="w-3 h-3 text-[#4747E1]" />
                   </div>
                   <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Download className="w-3 h-3 text-[#4A3AFF]" />
+                    <Download className="w-3 h-3 text-[#4747E1]" />
                   </div>
                   <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Trash2 className="w-3 h-3 text-[#4A3AFF]" />
+                    <Trash2 className="w-3 h-3 text-[#4747E1]" />
                   </div>
                 </div>
               </div>
@@ -146,7 +146,7 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
               </div>
               <div className="flex justify-between items-center text-[10px] text-gray-500">
                 <span>Created on {item.date}</span>
-                <span className="bg-[#4A3AFF] text-white text-[9px] px-2 py-1 rounded-full">{item.type}</span>
+                <span className="bg-[#4747E1] text-white text-[9px] px-2 py-1 rounded-full">{item.type}</span>
               </div>
             </div>
           ))}
@@ -182,7 +182,7 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
           disabled={!selectedResumeId}
           className={`w-full py-2 rounded-lg shadow-md transition-all text-xs font-medium ${
             selectedResumeId 
-              ? 'bg-[#4A3AFF] hover:bg-[#4A3AFF]/90 text-white' 
+              ? 'bg-[#4747E1] hover:bg-[#4747E1]/90 text-white' 
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >

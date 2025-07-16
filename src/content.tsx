@@ -110,7 +110,7 @@ const PlasmoOverlay = () => {
             }
             .snip-selection {
               position: fixed;
-              border: 2px dashed #4A3AFF;
+              border: 2px dashed #4747E1;
               background: rgba(74,58,255,0.15);
               pointer-events: none;
             }
@@ -232,12 +232,6 @@ const PlasmoOverlay = () => {
       afterSignOutUrl={window.location.href}
       signInFallbackRedirectUrl={window.location.href}
       signUpFallbackRedirectUrl={window.location.href}>
-      {!isVisible && (
-        <div
-          onMouseEnter={() => setIsVisible(true)}
-          className="plasmo-fixed plasmo-top-0 plasmo-right-0 plasmo-h-full plasmo-w-5 plasmo-z-[9998]"
-        />
-      )}
       <div
         className={`plasmo-z-50 plasmo-flex plasmo-fixed plasmo-top-32 plasmo-right-8 ${
           isVisible ? "plasmo-block" : "plasmo-hidden"

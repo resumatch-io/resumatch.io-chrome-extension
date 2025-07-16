@@ -12,7 +12,18 @@ import tailorIcon from "data-base64:../../assets/tailor-icon.svg";
 import GoogleLogo from "data-base64:../../assets/google-logo.svg";
 import docSignGif from "data-base64:../../assets/doc-sign.gif";
 import Upload from "data-base64:../../assets/screenshot.svg";
-import { FiArrowLeft, FiLogOut, FiX, FiUpload, FiPackage } from "react-icons/fi";
+// import collectionsIcon from "data-base64:../../assets/collections-icon.svg";
+import { FiArrowLeft, FiLogOut, FiX, FiUpload } from "react-icons/fi";
+
+// Collections Icon Component
+const CollectionsIcon = () => (
+  <svg width="32" height="32" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 6.5C3 4.843 3 4.015 3.464 3.464C3.929 3 4.757 3 6.414 3H8.5C9.328 3 9.742 3 10.121 3.121C10.5 3.243 10.828 3.472 11.485 3.929L12.515 4.571C13.172 5.028 13.5 5.257 13.879 5.379C14.258 5.5 14.672 5.5 15.5 5.5H16.586C18.243 5.5 19.071 5.5 19.536 6.036C20 6.571 20 7.399 20 9.056V13.5C20 16.328 20 17.743 19.121 18.621C18.243 19.5 16.828 19.5 14 19.5H8C5.172 19.5 3.757 19.5 2.879 18.621C2 17.743 2 16.328 2 13.5V8" stroke="#4747E1" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M3 8.5H19" stroke="#4747E1" strokeWidth="1.2" strokeLinecap="round"/>
+    <path d="M6 12.5H10M6 15.5H14" stroke="#4747E1" strokeWidth="1.2" strokeLinecap="round"/>
+    <circle cx="16.5" cy="13" r="1.5" stroke="#4747E1" strokeWidth="1.2"/>
+  </svg>
+);
 import TailorResumePage from "./tailor";
 import SelectResumePage from "./select";
 import ResumePage from "./resume";
@@ -88,7 +99,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
     {
       title: "Collections",
       description: "View your collections of tailored resumes.",
-      icon: <FiPackage className="w-10 h-10 text-[#4A3AFF]" />,
+      icon: <CollectionsIcon />,
       action: "collections",
       visibleTo: "signedIn"
     }
@@ -163,10 +174,6 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
     </div>
   );
 
-  const handleMouseEnter = () => {
-    setIsVisible(true);
-  };
-
   const handleClose = () => {
     setIsVisible(false);
     if (onClose) onClose();
@@ -181,23 +188,21 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
 
   return (
     <>
-      {/* Hover Trigger */}
-      <div
-        className="fixed top-1/2 right-0 w-8 h-32 -translate-y-1/2 z-[999998] bg-[#4A3AFF] hover:bg-blue-400 text-white text-xs font-mono font-bold cursor-pointer flex items-center justify-center transition-all duration-300 rounded-l-lg max-sm:w-6 max-sm:h-24"
-        onMouseEnter={() => setIsVisible(true)}
-        style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
-      >
-        {!isVisible && (
-          <>
-            <img
-              src={resumatchLogo}
-              alt="Resumatch Logo"
-              className="w-6 h-6 bg-white p-1 rounded rotate-90 max-sm:w-4 max-sm:h-4"
-            />
-            <p className="p-1 max-sm:text-[10px]">ResuMatch</p>
-          </>
-        )}
-      </div>
+      {/* Hover Trigger - only show when sidebar is not visible */}
+      {!isVisible && !forceVisible && (
+        <div
+          className="fixed top-1/2 right-0 w-8 h-32 -translate-y-1/2 z-[999998] bg-[#4747E1] text-white text-xs font-mono font-bold cursor-pointer flex items-center justify-center transition-all duration-300 rounded-l-lg max-sm:w-6 max-sm:h-24 opacity-15 hover:opacity-100 hover:scale-110"
+          onClick={() => setIsVisible(true)}
+          style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+        >
+          <img
+            src={resumatchLogo}
+            alt="Resumatch Logo"
+            className="w-6 h-6 bg-white p-1 rounded rotate-90 max-sm:w-4 max-sm:h-4"
+          />
+          <p className="p-1 max-sm:text-[10px]">ResuMatch</p>
+        </div>
+      )}
 
       {/* Sidebar Content */}
       {(isVisible || forceVisible) && (
@@ -219,7 +224,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                   {showLoading ? (
                     <div className="flex flex-col items-center justify-center h-full p-6">
                       <img src={docSignGif} alt="Processing..." className="w-32 h-32 mb-4" />
-                      <p className="text-lg font-bold text-[#4A3AFF]">Tailoring your resume...</p>
+                      <p className="text-lg font-bold text-[#4747E1]">Tailoring your resume...</p>
                     </div>
                   ) : showResume ? (
                     <ResumePage onBack={handleResumeBack} shareableLink={shareableLink || undefined} />
@@ -265,7 +270,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
               <Collections onBack={() => setCurrentPage("main")} />
             ) : (
               <>
-                <div className="bg-[#4A3AFF] flex justify-center items-center h-[150px] relative">
+                <div className="bg-[#4747E1] flex justify-center items-center h-[150px] relative">
                   <div className="flex items-center space-x-3 text-white">
                     <div className="bg-white p-2 rounded">
                       <img
@@ -320,7 +325,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                         .map((item, index) => (
                           <div
                             key={index}
-                            className="flex items-start space-x-3 bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer hover:border-[#4A3AFF]"
+                            className="flex items-start space-x-3 bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all cursor-pointer hover:border-[#4747E1]"
                             onClick={() => handleNavigation(item.action)}
                           >
                             <div className="flex items-center justify-center">

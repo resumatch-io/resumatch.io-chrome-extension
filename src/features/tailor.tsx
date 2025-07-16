@@ -261,39 +261,39 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           />
 
           {uploadedFile ? (
-            <div className="bg-white border-2 border-[#4A3AFF] rounded-lg p-4 text-center">
-              <div className="mx-auto w-10 h-10 bg-[#4A3AFF] rounded-full flex items-center justify-center mb-2">
+            <div className="bg-white border-2 border-[#4747E1] rounded-lg p-4 text-center">
+              <div className="mx-auto w-10 h-10 bg-[#4747E1] rounded-full flex items-center justify-center mb-2">
                 {isUploading ? (
                   <Loader2 className="w-5 h-5 text-white animate-spin" />
                 ) : (
                   <CheckCircle className="w-5 h-5 text-white" />
                 )}
               </div>
-              <p className="text-xs font-semibold text-[#4A3AFF] mb-1">
+              <p className="text-xs font-semibold text-[#4747E1] mb-1">
                 {isUploading ? 'Processing Resume...' : 'Resume Uploaded'}
               </p>
               <p className="text-xs text-gray-600 mb-1">{uploadedFile.name}</p>
               {!isUploading && (
                 <button 
                   onClick={handleRemoveFile}
-                  className="text-[10px] text-[#4A3AFF] hover:underline"
+                  className="text-[10px] text-[#4747E1] hover:underline"
                 >
                   Remove File
                 </button>
               )}
             </div>
           ) : selectedResume ? (
-            <div className="bg-white border-2 border-[#4A3AFF] rounded-lg p-4 text-center">
-              <div className="mx-auto w-10 h-10 bg-[#4A3AFF] rounded-full flex items-center justify-center mb-2">
+            <div className="bg-white border-2 border-[#4747E1] rounded-lg p-4 text-center">
+              <div className="mx-auto w-10 h-10 bg-[#4747E1] rounded-full flex items-center justify-center mb-2">
                 <CheckCircle className="w-5 h-5 text-white" />
               </div>
-              <p className="text-xs font-semibold text-[#4A3AFF] mb-1">Resume Selected</p>
+              <p className="text-xs font-semibold text-[#4747E1] mb-1">Resume Selected</p>
               <p className="text-xs text-gray-600 mb-1">{selectedResume}</p>
               <div className="flex justify-center space-x-3">
                 <SignedIn>
                   <button 
                     onClick={onSelectFromCollections}
-                    className="text-[10px] text-[#4A3AFF] hover:underline"
+                    className="text-[10px] text-[#4747E1] hover:underline"
                   >
                     Change Resume
                   </button>
@@ -310,7 +310,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
             <div 
               className={`bg-white border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
                 isDragOver 
-                  ? 'border-[#4A3AFF] bg-[#4A3AFF]/5' 
+                  ? 'border-[#4747E1] bg-[#4747E1]/5' 
                   : 'border-gray-300 hover:border-gray-400'
               } ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
               onClick={handleUploadButtonClick}
@@ -342,7 +342,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           onClick={handleTailorResume}
           className={`w-full py-2 rounded-lg shadow-md transition-all text-xs font-medium ${
             isFormComplete() && !isUploading && !isGenerating
-              ? 'bg-[#4A3AFF] hover:bg-[#4A3AFF]/90 text-white cursor-pointer'
+              ? 'bg-[#4747E1] hover:bg-[#4747E1]/90 text-white cursor-pointer'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >

@@ -100,7 +100,7 @@ export default function Screenshot({ onScreenshotCaptured, initialScreenshot, on
         }
         .snip-selection {
           position: fixed;
-          border: 2px dashed #4A3AFF;
+          border: 2px dashed #4747E1;
           background: rgba(74,58,255,0.15);
           pointer-events: none;
         }
@@ -266,7 +266,7 @@ export default function Screenshot({ onScreenshotCaptured, initialScreenshot, on
         className={`px-4 py-2 text-white rounded transition-colors ${
           isCapturing
             ? "bg-gray-400 cursor-not-allowed"
-            : "bg-[#4A3AFF] hover:bg-[#3d2ecc]"
+            : "bg-[#4747E1] hover:bg-[#3d2ecc]"
         }`}
       >
         {isCapturing ? "Capturing..." : "Capture Screenshot"}
