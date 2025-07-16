@@ -1,8 +1,13 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/chrome-extension";
-import { FiTrash2, FiEdit3, FiCalendar, FiExternalLink } from "react-icons/fi";
+import { FiTrash2, FiEdit3, FiCalendar, FiExternalLink, FiArrowLeft } from "react-icons/fi";
+import resumatchLogo from "data-base64:../../assets/resumatch-logo.svg";
 
-export default function Collections() {
+interface CollectionsProps {
+  onBack?: () => void;
+}
+
+export default function Collections({ onBack }: CollectionsProps) {
   const { user } = useUser();
   const [collections, setCollections] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -57,12 +62,33 @@ export default function Collections() {
     });
   };
 
+  const renderPageHeader = () => (
+    <div className="flex pt-5 pb-4 items-center px-4 border-b border-gray-200 relative">
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="text-gray-600 hover:text-gray-800 transition-colors"
+        >
+          <FiArrowLeft className="text-lg" />
+        </button>
+      )}
+
+      <div className="flex items-center space-x-2 absolute left-1/2 transform -translate-x-1/2">
+        <img src={resumatchLogo} alt="Resumatch Logo" className="w-6 h-6" />
+        <span className="text-sm font-semibold text-gray-900">Resumatch.io</span>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className="p-6 h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4A3AFF] mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading collections...</p>
+      <div className="h-full flex flex-col">
+        {renderPageHeader()}
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4A3AFF] mx-auto mb-4" />
+            <p className="text-gray-600">Loading collections...</p>
+          </div>
         </div>
       </div>
     );
@@ -70,22 +96,27 @@ export default function Collections() {
 
   if (error) {
     return (
-      <div className="p-6 h-full">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h2 className="text-lg font-semibold text-red-800 mb-2">Error</h2>
-          <p className="text-red-600">{error}</p>
+      <div className="h-full flex flex-col">
+        {renderPageHeader()}
+        <div className="flex-1 p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h2 className="text-lg font-semibold text-red-800 mb-2">Error</h2>
+            <p className="text-red-600">{error}</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 h-full overflow-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Collections</h1>
-        <p className="text-gray-600 mt-1">Your tailored resume collection</p>
-        
-      </div>
+    <div className="h-full flex flex-col">
+      {renderPageHeader()}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-800">Collections</h1>
+          <p className="text-gray-600 mt-1">Your tailored resume collection</p>
+          
+        </div>
       
       {collections && collections.length > 0 ? (
         <div className="space-y-4">
@@ -120,12 +151,14 @@ export default function Collections() {
                 
                 <div className="flex items-center space-x-2 ml-4">
                   <button 
+                    type="button"
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
                     title="Delete"
                   >
                     <FiTrash2 className="w-4 h-4" />
                   </button>
                   <button 
+                    type="button"
                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200"
                     title="Edit"
                   >
@@ -144,6 +177,7 @@ export default function Collections() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

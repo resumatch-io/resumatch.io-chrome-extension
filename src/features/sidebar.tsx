@@ -262,7 +262,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                 </div>
               </>
             ) : currentPage === "collections" ? (
-              <Collections />
+              <Collections onBack={() => setCurrentPage("main")} />
             ) : (
               <>
                 <div className="bg-[#4A3AFF] flex justify-center items-center h-[150px] relative">
