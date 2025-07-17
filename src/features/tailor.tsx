@@ -128,25 +128,21 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
       const img = new Image();
       img.onload = () => {
         console.log('[Tailor] Original image dimensions:', img.width, 'x', img.height);
-        console.log('[Tailor] Crop rect:', rect);
+        console.log('[Tailor] Crop rect (image coordinates):', rect);
         
-        // Calculate the scale factor between the captured image and screen
-        const scaleX = img.width / (window.screen.width * window.devicePixelRatio);
-        const scaleY = img.height / (window.screen.height * window.devicePixelRatio);
-        
-        // Adjust the crop coordinates to match the actual image size
-        const adjustedRect = {
-          x: Math.max(0, Math.round(rect.x * scaleX)),
-          y: Math.max(0, Math.round(rect.y * scaleY)),
-          width: Math.min(img.width, Math.round(rect.width * scaleX)),
-          height: Math.min(img.height, Math.round(rect.height * scaleY))
+        // Ensure the crop coordinates are within bounds
+        const safeRect = {
+          x: Math.max(0, Math.min(rect.x, img.width - 1)),
+          y: Math.max(0, Math.min(rect.y, img.height - 1)),
+          width: Math.max(1, Math.min(rect.width, img.width - Math.max(0, rect.x))),
+          height: Math.max(1, Math.min(rect.height, img.height - Math.max(0, rect.y)))
         };
         
-        console.log('[Tailor] Adjusted crop rect:', adjustedRect);
+        console.log('[Tailor] Safe crop rect:', safeRect);
         
         const canvas = document.createElement('canvas');
-        canvas.width = adjustedRect.width;
-        canvas.height = adjustedRect.height;
+        canvas.width = safeRect.width;
+        canvas.height = safeRect.height;
         const ctx = canvas.getContext('2d');
         
         if (!ctx) {
@@ -154,14 +150,14 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           return;
         }
         
-        // Draw the cropped portion with adjusted coordinates
+        // Draw the cropped portion
         ctx.drawImage(
           img,
-          adjustedRect.x, adjustedRect.y, adjustedRect.width, adjustedRect.height,
-          0, 0, adjustedRect.width, adjustedRect.height
+          safeRect.x, safeRect.y, safeRect.width, safeRect.height,
+          0, 0, safeRect.width, safeRect.height
         );
         
-        console.log('[Tailor] Canvas dimensions after crop:', canvas.width, 'x', canvas.height);
+        console.log('[Tailor] Final canvas dimensions:', canvas.width, 'x', canvas.height);
         resolve(canvas.toDataURL('image/png'));
       };
       
@@ -333,9 +329,8 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
 
           const endX = e.clientX;
           const endY = e.clientY;
-          const dpr = window.devicePixelRatio || 1;
           
-          // Calculate rect relative to viewport without DPR scaling initially
+          // Calculate rect relative to viewport (no DPR scaling yet)
           const viewportRect = {
             x: Math.min(startX, endX) + window.scrollX,
             y: Math.min(startY, endY) + window.scrollY,
@@ -343,7 +338,8 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
             height: Math.abs(endY - startY)
           };
           
-          // Apply DPR scaling
+          // Apply DPR scaling to match screenshot coordinates
+          const dpr = window.devicePixelRatio || 1;
           const rect = {
             x: Math.round(viewportRect.x * dpr),
             y: Math.round(viewportRect.y * dpr),
@@ -358,19 +354,19 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           
           cleanup();
 
-          if (rect.width < 5 || rect.height < 5) {
+          if (viewportRect.width < 5 || viewportRect.height < 5) {
             console.warn('[Tailor] Snip selection too small, cancelled');
             resolve(null);
             return;
           }
 
+          // Show processing state
+          setIsOcrLoading(true);
+
           try {
             console.log('[Tailor] Sending screenshot capture request with rect:', rect);
             console.log('[Tailor] Viewport rect (before DPR):', viewportRect);
             console.log('[Tailor] Device pixel ratio:', dpr);
-            
-            // Show processing state
-            setIsOcrLoading(true);
             
             // Capture the screenshot and crop the selected region
             chrome.runtime.sendMessage(

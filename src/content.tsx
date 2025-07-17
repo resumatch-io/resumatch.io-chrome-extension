@@ -13,7 +13,9 @@ declare global {
 
 const PUBLISHABLE_KEY = process.env.PLASMO_PUBLIC_CLERK_PUBLISHABLE_KEY
 
-if (!PUBLISHABLE_KEY) {
+const SYNC_HOST = process.env.PLASMO_PUBLIC_CLERK_SYNC_HOST
+
+if (!PUBLISHABLE_KEY || !SYNC_HOST ) {
   throw new Error(
     "Please add the PLASMO_PUBLIC_CLERK_PUBLISHABLE_KEY to the .env.development file"
   )
@@ -211,7 +213,8 @@ const PlasmoOverlay = () => {
       publishableKey={PUBLISHABLE_KEY}
       afterSignOutUrl={window.location.href}
       signInFallbackRedirectUrl={window.location.href}
-      signUpFallbackRedirectUrl={window.location.href}>
+      signUpFallbackRedirectUrl={window.location.href}
+      syncHost={SYNC_HOST}>
       <div
         className={`plasmo-z-50 plasmo-flex plasmo-fixed plasmo-top-32 plasmo-right-8 ${
           isVisible ? "plasmo-block" : "plasmo-hidden"
