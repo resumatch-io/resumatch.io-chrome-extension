@@ -1,23 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star, Edit2, Download, Trash2, FileText, Copy } from 'lucide-react';
-
-const mockResumes = Array(8).fill({
-  title: 'Resume 2',
-  tags: ['Remote', 'Part-time', 'Contract', 'Mid Level'],
-  type: 'Cover Letter',
-  date: '10-Jan-2024',
-});
+import { useUser } from '@clerk/chrome-extension';
 
 interface SelectResumePageProps {
   onResumeSelect?: (resumeName: string) => void;
 }
 
 const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) => {
+  const { user } = useUser();
   const [search, setSearch] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
+  const [collections, setCollections] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCollections = async () => {
+      if (!user?.id || !user?.emailAddresses?.[0]?.emailAddress) {
+        setError('User not authenticated or email not available');
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        setError(null);
+        const userEmail = user.emailAddresses[0].emailAddress;
+        const response = await chrome.runtime.sendMessage({
+          action: 'FETCH_COLLECTIONS',
+          email: userEmail,
+        });
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to fetch collections');
+        }
+        setCollections(response.data.data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCollections();
+  }, [user?.id, user?.emailAddresses]);
 
   const handleResumeClick = (resumeName: string, resumeId: string) => {
     setSelectedResumeId(resumeId);
@@ -28,6 +54,15 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
       const resumeName = selectedResumeId === 'my-resume' ? 'My Resume' : `Resume ${selectedResumeId}`;
       onResumeSelect(resumeName);
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
   };
 
   return (
@@ -62,97 +97,80 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
         </div>
 
         <p className="text-[10px] text-gray-500 mb-3">
-          164 results based on your <span className="text-blue-600 underline cursor-pointer">profile</span> and activity
+          {/* You can update this count based on collections.length if needed */}
+          {collections ? `${collections.length} results based on your ` : ''}
+          <span className="text-blue-600 underline cursor-pointer">profile</span> and activity
         </p>
 
         <div className="space-y-3 pb-4">
-          <div 
-            className={`border-2 rounded-lg p-3 bg-white shadow-sm cursor-pointer transition-all ${
-              selectedResumeId === 'my-resume' 
-                ? 'border-[#4747E1] bg-[#4747E1]/5' 
-                : 'border hover:border-[#4747E1]'
-            }`}
-            onClick={() => handleResumeClick('My Resume', 'my-resume')}
-          >
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-xs font-semibold text-gray-800">My Resume</h3>
-              <div className="flex gap-1">
-                <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Star className="w-3 h-3 text-[#4747E1]" />
-                </div>
-                <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Copy className="w-3 h-3 text-[#4747E1]" />
-                </div>
-                <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Edit2 className="w-3 h-3 text-[#4747E1]" />
-                </div>
-                <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Download className="w-3 h-3 text-[#4747E1]" />
-                </div>
-                <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                  <Trash2 className="w-3 h-3 text-[#4747E1]" />
-                </div>
-              </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4747E1] mr-2" />
+              <span className="text-xs text-gray-500">Loading collections...</span>
             </div>
-            <div className="flex flex-wrap gap-1 mb-2 text-[10px]">
-              {['Remote', 'Part-time', 'Contract', 'Mid Level'].map((tag) => (
-                <span key={tag} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
-                  {tag}
-                </span>
-              ))}
+          ) : error ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-xs text-red-700">
+              {error}
             </div>
-            <div className="flex justify-between items-center text-[10px] text-gray-500">
-              <span>Created on 10-Jan-2024</span>
-              <span className="bg-[#4747E1] text-white text-[9px] px-2 py-1 rounded-full">Resume</span>
-            </div>
-          </div>
-
-          {mockResumes.slice(0, 5).map((item, index) => (
-            <div
-              key={index}
-              className={`border rounded-lg p-3 bg-white shadow-sm cursor-pointer transition-all ${
-                selectedResumeId === `resume-${index}` 
-                  ? 'border-[#4747E1] bg-[#4747E1]/5 border-2' 
-                  : 'border-gray-200 hover:border-[#4747E1]'
-              }`}
-              onClick={() => handleResumeClick(item.title, `resume-${index}`)}
-            >
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xs font-semibold text-gray-800">{item.title}</h3>
-                <div className="flex gap-1">
-                  <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Star className="w-3 h-3 text-[#4747E1]" />
-                  </div>
-                  <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Copy className="w-3 h-3 text-[#4747E1]" />
-                  </div>
-                  <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Edit2 className="w-3 h-3 text-[#4747E1]" />
-                  </div>
-                  <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Download className="w-3 h-3 text-[#4747E1]" />
-                  </div>
-                  <div className="bg-gray-300 p-1 rounded-md cursor-pointer hover:bg-gray-400 transition-colors">
-                    <Trash2 className="w-3 h-3 text-[#4747E1]" />
+          ) : collections && collections.length > 0 ? (
+            collections.map((item, index) => (
+              <div
+                key={item.id || index}
+                className={`group border rounded-xl p-4 bg-white shadow-sm cursor-pointer transition-all flex flex-col gap-2 hover:shadow-lg hover:border-[#6366F1] active:scale-[0.98] ${
+                  selectedResumeId === `${item.id}`
+                    ? 'border-[#4747E1] bg-[#f5f5ff] border-2 shadow-md'
+                    : 'border-gray-200'
+                }`}
+                onClick={() => handleResumeClick(item.name || 'Untitled', `${item.id}`)}
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <h3 className="text-sm font-semibold text-gray-900 truncate max-w-[60%]">{item.name || 'Untitled'}</h3>
+                  <div className="flex gap-1">
+                    <div className="bg-gray-100 p-1 rounded-md cursor-pointer group-hover:bg-gray-200 transition-colors">
+                      <Star className="w-4 h-4 text-[#4747E1]" />
+                    </div>
+                    <div className="bg-gray-100 p-1 rounded-md cursor-pointer group-hover:bg-gray-200 transition-colors">
+                      <Copy className="w-4 h-4 text-[#4747E1]" />
+                    </div>
+                    <div className="bg-gray-100 p-1 rounded-md cursor-pointer group-hover:bg-gray-200 transition-colors">
+                      <Edit2 className="w-4 h-4 text-[#4747E1]" />
+                    </div>
+                    <div className="bg-gray-100 p-1 rounded-md cursor-pointer group-hover:bg-gray-200 transition-colors">
+                      <Download className="w-4 h-4 text-[#4747E1]" />
+                    </div>
+                    <div className="bg-gray-100 p-1 rounded-md cursor-pointer group-hover:bg-gray-200 transition-colors">
+                      <Trash2 className="w-4 h-4 text-[#4747E1]" />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-1 mb-2 text-[10px]">
-                {item.tags.map((tag) => (
-                  <span key={tag} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
-                    {tag}
+                <div className="flex flex-wrap gap-1 mb-1 text-[11px] min-h-[20px]">
+                  {Array.isArray(item.tags) && item.tags.length > 0 ? (
+                    item.tags.map((tag: string) => (
+                      <span key={tag} className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
+                        {tag}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full">No tags</span>
+                  )}
+                </div>
+                <div className="flex justify-between items-center text-[11px] text-gray-500 mt-1">
+                  <span>Created on {formatDate(item.createdAt)}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                    (item.type || '').toLowerCase().includes('cover')
+                      ? 'bg-pink-100 text-pink-700'
+                      : 'bg-[#4747E1] text-white'
+                  }`}>
+                    {item.type || 'Resume'}
                   </span>
-                ))}
+                </div>
               </div>
-              <div className="flex justify-between items-center text-[10px] text-gray-500">
-                <span>Created on {item.date}</span>
-                <span className="bg-[#4747E1] text-white text-[9px] px-2 py-1 rounded-full">{item.type}</span>
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="text-center py-8 text-xs text-gray-500">No resumes found. Start creating your first tailored resume!</div>
+          )}
         </div>
       </div>
-
       <div className="border-t border-gray-200 p-4 space-y-3">
         <div className="flex justify-center items-center gap-1 text-xs text-gray-700">
           <button className="w-6 h-6 flex items-center justify-center rounded-full border bg-white hover:bg-gray-100">
@@ -176,13 +194,12 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
             &gt;
           </button>
         </div>
-        
-        <button 
+        <button
           onClick={handleSelectResume}
           disabled={!selectedResumeId}
           className={`w-full py-2 rounded-lg shadow-md transition-all text-xs font-medium ${
-            selectedResumeId 
-              ? 'bg-[#4747E1] hover:bg-[#4747E1]/90 text-white' 
+            selectedResumeId
+              ? 'bg-[#4747E1] hover:bg-[#4747E1]/90 text-white'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >

@@ -238,6 +238,10 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                       onJobDescriptionChange={setJobDescription}
                       onFileDialogOpen={onFileDialogOpen}
                       onFileDialogClose={onFileDialogClose}
+                      onSidebarVisibilityChange={(visible) => {
+                        setIsVisible(visible);
+                        if (onClose && !visible) onClose();
+                      }}
                     />
                   )}
                 </div>

@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react'
 import { Upload, CheckCircle, Loader2 } from 'lucide-react'
+import { Camera } from 'lucide-react'
 import { SignedIn, SignedOut } from "@clerk/chrome-extension"
+import Tesseract from 'tesseract.js';
 
 // Define ParseResult type locally
 interface ParseResult {
@@ -18,17 +20,19 @@ interface TailorResumePageProps {
   onJobDescriptionChange?: (text: string) => void
   onFileDialogOpen?: () => void
   onFileDialogClose?: () => void
+  onSidebarVisibilityChange?: (visible: boolean, data?: { capturedScreenshot?: string }) => void
 }
 
-const TailorResumePage: React.FC<TailorResumePageProps> = ({ 
-  onSelectFromCollections, 
-  selectedResume, 
+const TailorResumePage: React.FC<TailorResumePageProps> = ({
+  onSelectFromCollections,
+  selectedResume,
   onTailorStart,
   onResumeRemove,
   jobDescriptionText = '',
   onJobDescriptionChange,
   onFileDialogOpen,
-  onFileDialogClose
+  onFileDialogClose,
+  onSidebarVisibilityChange
 }) => {
   const [jobDescription, setJobDescription] = useState(jobDescriptionText)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
@@ -36,12 +40,17 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
   const [isDragOver, setIsDragOver] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isOcrLoading, setIsOcrLoading] = useState(false)
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
+  const [ocrError, setOcrError] = useState<string | null>(null)
+  const [ocrWarning, setOcrWarning] = useState<string | null>(null)
+  const [lastOcrImage, setLastOcrImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const validateFile = (file: File) => {
     const allowedTypes = ['application/pdf']
-    const maxSize = 5 * 1024 * 1024
-    
+    const maxSize = 5 * 1024 * 1024 // 5MB
+
     if (!allowedTypes.includes(file.type)) {
       alert('Please upload a PDF file only.')
       return false
@@ -53,17 +62,12 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     return true
   }
 
-  // Replace parseDocumentLocal to use background script
   const parseDocumentLocal = async (file: File): Promise<ParseResult> => {
     try {
-      // Read file as ArrayBuffer
       const arrayBuffer = await file.arrayBuffer();
       return new Promise((resolve) => {
         chrome.runtime.sendMessage(
-          {
-            action: "PARSE_PDF",
-            pdfData: arrayBuffer
-          },
+          { action: "PARSE_PDF", pdfData: arrayBuffer },
           (response) => {
             if (response?.success) {
               resolve({ fileName: file.name, parsedText: response.text });
@@ -89,11 +93,11 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     onFileDialogClose?.()
     const file = event.target.files?.[0]
-    
+
     if (file && validateFile(file)) {
       setIsUploading(true)
       setUploadedFile(file)
-      
+
       try {
         const result = await parseDocumentLocal(file)
         setParsedText(result.parsedText)
@@ -105,7 +109,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
         setIsUploading(false)
       }
     }
-    
+
     if (event.target) event.target.value = ''
   }
 
@@ -113,11 +117,11 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     event.preventDefault()
     setIsDragOver(false)
     const file = event.dataTransfer.files[0]
-    
+
     if (file && validateFile(file)) {
       setIsUploading(true)
       setUploadedFile(file)
-      
+
       try {
         const result = await parseDocumentLocal(file)
         setParsedText(result.parsedText)
@@ -154,17 +158,12 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     setIsGenerating(true)
     try {
       chrome.runtime.sendMessage(
-        {
-          action: 'GENERATE_RESUME',
-          parsedText,
-          jobDescription
-        },
+        { action: 'GENERATE_RESUME', parsedText, jobDescription },
         (response) => {
           if (response?.success && response.data?.resume) {
             const summary = Array.isArray(response.data.resume.summary) && response.data.resume.summary.length > 0
               ? response.data.resume.summary[0]
               : '';
-            console.log(response.data.resume);
             chrome.runtime.sendMessage(
               {
                 action: 'SAVE_RESUME',
@@ -196,6 +195,166 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     }
   }
 
+  function cleanOcrText(text: string): string {
+    return text
+      .replace(/[^\x20-\x7E\n]+/g, '') // Keep printable ASCII and newlines
+      .replace(/\n{2,}/g, '\n') // Collapse multiple newlines
+      .replace(/[ \t]+/g, ' ') // Collapse whitespace
+      .replace(/^ +| +$/gm, '') // Trim lines
+      .trim();
+  }
+
+  const handleRetryOcr = async () => {
+    if (!lastOcrImage) return;
+    setOcrError(null);
+    setOcrWarning(null);
+    setIsOcrLoading(true);
+    setScreenshotPreview(lastOcrImage); // Show the preview again on retry
+    console.log('[Tailor] Retrying OCR...');
+    try {
+      console.log('[Tailor] OCR started (retry)');
+      const ocrResult = await Tesseract.recognize(lastOcrImage, 'eng');
+      let text = cleanOcrText(ocrResult.data.text || '');
+      console.log('[Tailor] OCR finished (retry):', text);
+      if (text.length < 20) {
+        setOcrWarning('Extracted text looks incomplete. Try recapturing or retrying.');
+        console.warn('[Tailor] OCR warning: text too short (retry)');
+      } else {
+        setOcrWarning(null);
+      }
+      setJobDescription(text);
+      onJobDescriptionChange?.(text);
+      setScreenshotPreview(null);
+    } catch (err) {
+      setOcrError('OCR failed. Please try again.');
+      console.error('[Tailor] OCR failed (retry):', err);
+    } finally {
+      setIsOcrLoading(false);
+    }
+  };
+
+  const handleTakeScreenshot = async () => {
+    // Reset state for a new capture
+    setScreenshotPreview(null);
+    setOcrError(null);
+    setOcrWarning(null);
+    console.log('[Tailor] Screenshot capture started');
+    try {
+      if (onSidebarVisibilityChange) onSidebarVisibilityChange(false);
+      const existingHost = document.getElementById("snip-shadow-host");
+      if (existingHost) existingHost.remove();
+      const host = document.createElement("div");
+      host.id = "snip-shadow-host";
+      host.style.position = "fixed";
+      host.style.top = "0";
+      host.style.left = "0";
+      host.style.width = "100vw";
+      host.style.height = "100vh";
+      host.style.zIndex = "2147483647";
+      host.style.pointerEvents = "auto";
+      document.body.appendChild(host);
+      const shadow = host.attachShadow({ mode: "open" });
+      const style = document.createElement("style");
+      style.textContent = `
+        .snip-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.2); cursor: crosshair; user-select: none; }
+        .snip-selection { position: fixed; border: 2px dashed #4747E1; background: rgba(74,58,255,0.15); pointer-events: none; }
+      `;
+      shadow.appendChild(style);
+      const overlay = document.createElement("div");
+      overlay.className = "snip-overlay";
+      shadow.appendChild(overlay);
+      const selectionBox = document.createElement("div");
+      selectionBox.className = "snip-selection";
+      selectionBox.style.display = "none";
+      shadow.appendChild(selectionBox);
+      let startX = 0, startY = 0, endX = 0, endY = 0, isSelecting = false;
+      overlay.addEventListener("mousedown", (e) => {
+        isSelecting = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        selectionBox.style.display = "block";
+        selectionBox.style.left = `${startX}px`;
+        selectionBox.style.top = `${startY}px`;
+        selectionBox.style.width = "0px";
+        selectionBox.style.height = "0px";
+        console.log('[Tailor] Snip selection started');
+      });
+      overlay.addEventListener("mousemove", (e) => {
+        if (!isSelecting) return;
+        endX = e.clientX;
+        endY = e.clientY;
+        const left = Math.min(startX, endX);
+        const top = Math.min(startY, endY);
+        const width = Math.abs(endX - startX);
+        const height = Math.abs(endY - startY);
+        selectionBox.style.left = `${left}px`;
+        selectionBox.style.top = `${top}px`;
+        selectionBox.style.width = `${width}px`;
+        selectionBox.style.height = `${height}px`;
+      });
+      overlay.addEventListener("mouseup", async () => {
+        if (!isSelecting) return;
+        isSelecting = false;
+        const dpr = window.devicePixelRatio || 1;
+        const rect = {
+          x: (Math.min(startX, endX) + window.scrollX) * dpr,
+          y: (Math.min(startY, endY) + window.scrollY) * dpr,
+          width: Math.abs(endX - startX) * dpr,
+          height: Math.abs(endY - startY) * dpr
+        };
+        host.remove();
+        if (rect.width < 5 || rect.height < 5) {
+          if (onSidebarVisibilityChange) onSidebarVisibilityChange(true);
+          console.warn('[Tailor] Snip selection too small, cancelled');
+          return;
+        }
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ action: "captureRegionScreenshot", rect }, async (response) => {
+            if (onSidebarVisibilityChange) onSidebarVisibilityChange(true);
+            if (response.status === "success" && response.screenshot) {
+              setScreenshotPreview(response.screenshot);
+              setLastOcrImage(response.screenshot);
+              setOcrError(null);
+              setOcrWarning(null);
+              setIsOcrLoading(true);
+              console.log('[Tailor] Screenshot captured, OCR started');
+              try {
+                const ocrResult = await Tesseract.recognize(response.screenshot, 'eng');
+                let text = cleanOcrText(ocrResult.data.text || '');
+                console.log('[Tailor] OCR finished:', text);
+                if (text.length < 20) {
+                  setOcrWarning('Extracted text looks incomplete. Try recapturing or retrying.');
+                  console.warn('[Tailor] OCR warning: text too short');
+                } else {
+                  setOcrWarning(null);
+                }
+                setJobDescription(text);
+                onJobDescriptionChange?.(text);
+                setScreenshotPreview(null);
+              } catch (err) {
+                setOcrError('OCR failed. Please try again.');
+                console.error('[Tailor] OCR failed:', err);
+              } finally {
+                setIsOcrLoading(false);
+              }
+            } else {
+              setOcrError("Failed to capture screenshot.");
+              setScreenshotPreview(null);
+              console.error("[Tailor] Custom screenshot failed", response);
+            }
+          });
+        }, 50);
+      });
+    } catch (error) {
+      setOcrError('Screenshot capture failed.');
+      setScreenshotPreview(null);
+      console.error("[Tailor] Error during snipping tool", error);
+      if (onSidebarVisibilityChange) onSidebarVisibilityChange(true);
+      const existingHost = document.getElementById("snip-shadow-host");
+      if (existingHost) existingHost.remove();
+    }
+  };
+
   return (
     <div className="h-full bg-white flex flex-col">
       <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -204,8 +363,38 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
         <div className="w-full mb-4">
           <h2 className="text-center text-xs font-semibold text-gray-800 mb-3">Job Description</h2>
           <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
-            <label className="block text-xs font-medium text-gray-800 mb-2">
-              Job Description <span className="text-red-500">*</span>
+            <label className="block text-xs font-medium text-gray-800 mb-2 flex items-center justify-between">
+              <span>Job Description <span className="text-red-500">*</span></span>
+              {isOcrLoading ? (
+                <div className="ml-2 flex items-center gap-2 px-3 py-1.5 border border-[#4747E1] bg-white text-[#4747E1] text-xs font-semibold rounded-lg">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Extracting text...</span>
+                </div>
+              ) : screenshotPreview ? (
+                <div className="ml-2 flex items-center gap-2">
+                  <img
+                    src={screenshotPreview}
+                    alt="Screenshot preview"
+                    className="w-24 h-16 object-cover border border-gray-300 rounded shadow-sm bg-white"
+                  />
+                  <button
+                    onClick={() => setScreenshotPreview(null)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="ml-2 flex items-center gap-1 px-3 py-1.5 border border-[#4747E1] bg-white text-[#4747E1] text-xs font-semibold rounded-lg shadow-sm hover:bg-[#f5f5ff] transition-colors"
+                  onClick={handleTakeScreenshot}
+                  disabled={isOcrLoading}
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Screenshot</span>
+                </button>
+              )}
             </label>
             <textarea
               value={jobDescription}
@@ -213,36 +402,68 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
                 const newValue = e.target.value
                 setJobDescription(newValue)
                 onJobDescriptionChange?.(newValue)
+                // If user types, the preview is no longer relevant
+                if (screenshotPreview) {
+                  setScreenshotPreview(null);
+                  console.log('[Tailor] User typed in textarea, preview cleared');
+                }
               }}
               rows={4}
-              className="w-full text-xs border border-gray-300 rounded-md p-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className={`w-full text-xs border border-gray-300 rounded-md p-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${isOcrLoading ? 'bg-gray-50 cursor-not-allowed' : ''}`}
               placeholder="Enter job description here..."
+              disabled={isOcrLoading}
             />
+            {isOcrLoading && (
+              <div className="flex items-center gap-2 mt-2 text-xs text-[#4747E1]">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Extracting text from screenshot...
+              </div>
+            )}
+            {ocrWarning && !isOcrLoading && (
+              <div className="flex items-center gap-2 mt-2 text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 rounded p-2">
+                <span>⚠️ {ocrWarning}</span>
+                <button
+                  className="ml-auto px-2 py-1 text-xs border border-yellow-400 rounded bg-yellow-100 hover:bg-yellow-200"
+                  onClick={handleRetryOcr}
+                  disabled={isOcrLoading}
+                >Retry</button>
+              </div>
+            )}
+            {ocrError && !isOcrLoading && (
+              <div className="flex items-center gap-2 mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                <span>❌ {ocrError}</span>
+                <button
+                  className="ml-auto px-2 py-1 text-xs border border-red-400 rounded bg-red-100 hover:bg-red-200"
+                  onClick={handleRetryOcr}
+                  disabled={isOcrLoading}
+                >Retry</button>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="w-full mb-4">
           {!selectedResume && !uploadedFile && (
             <div className="flex justify-center space-x-4 mb-3">
-              <button 
+              <button
                 onClick={handleUploadButtonClick}
                 disabled={isUploading}
                 className="text-xs font-semibold text-gray-800 hover:text-blue-600 transition-colors disabled:opacity-50"
               >
                 Upload Resume
               </button>
-              
+
               <SignedIn>
-                <button 
+                <button
                   onClick={onSelectFromCollections}
                   className="text-xs font-semibold text-gray-800 hover:text-blue-600 transition-colors"
                 >
                   Select from Collections
                 </button>
               </SignedIn>
-              
+
               <SignedOut>
-                <button 
+                <button
                   onClick={() => alert("Please sign in to access your resume collections")}
                   className="text-xs font-semibold text-gray-400 cursor-not-allowed"
                 >
@@ -274,7 +495,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               </p>
               <p className="text-xs text-gray-600 mb-1">{uploadedFile.name}</p>
               {!isUploading && (
-                <button 
+                <button
                   onClick={handleRemoveFile}
                   className="text-[10px] text-[#4747E1] hover:underline"
                 >
@@ -291,14 +512,14 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               <p className="text-xs text-gray-600 mb-1">{selectedResume}</p>
               <div className="flex justify-center space-x-3">
                 <SignedIn>
-                  <button 
+                  <button
                     onClick={onSelectFromCollections}
                     className="text-[10px] text-[#4747E1] hover:underline"
                   >
                     Change Resume
                   </button>
                 </SignedIn>
-                <button 
+                <button
                   onClick={onResumeRemove}
                   className="text-[10px] text-red-500 hover:underline"
                 >
@@ -307,10 +528,10 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               </div>
             </div>
           ) : (
-            <div 
+            <div
               className={`bg-white border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                isDragOver 
-                  ? 'border-[#4747E1] bg-[#4747E1]/5' 
+                isDragOver
+                  ? 'border-[#4747E1] bg-[#4747E1]/5'
                   : 'border-gray-300 hover:border-gray-400'
               } ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
               onClick={handleUploadButtonClick}
@@ -336,7 +557,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
       </div>
 
       <div className="border-t border-gray-200 p-4">
-        <button 
+        <button
           type="button"
           disabled={!isFormComplete() || isUploading || isGenerating}
           onClick={handleTailorResume}
@@ -350,7 +571,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
         </button>
         {!isFormComplete() && !isUploading && !isGenerating && (
           <p className="text-[10px] text-gray-500 text-center mt-2">
-            Please {!jobDescription.trim() ? 'enter job description' : ''} 
+            Please {!jobDescription.trim() ? 'enter job description' : ''}
             {!jobDescription.trim() && !(selectedResume || uploadedFile) ? ' and ' : ''}
             {!(selectedResume || uploadedFile) ? 'upload/select a resume' : ''}
           </p>
