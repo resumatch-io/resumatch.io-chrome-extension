@@ -230,6 +230,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     console.log('[Tailor] Screenshot capture started');
 
     try {
+      // Keep sidebar visible; overlay will cover interactions
       if (onSidebarVisibilityChange) onSidebarVisibilityChange(false);
 
       // Create and setup the snipping tool overlay
@@ -289,9 +290,8 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
       const cleanup = () => {
         host.remove();
         setIsCapturingScreenshot(false);
-        if (onSidebarVisibilityChange) {
-          onSidebarVisibilityChange(true);
-        }
+        // Keep sidebar visible
+        if (onSidebarVisibilityChange) onSidebarVisibilityChange(true);
       };
 
       return await new Promise((resolve) => {
