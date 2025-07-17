@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Upload, CheckCircle, Loader2 } from 'lucide-react'
 import { Camera } from 'lucide-react'
 import { SignedIn, SignedOut } from "@clerk/chrome-extension"
@@ -23,6 +23,22 @@ interface TailorResumePageProps {
   onSidebarVisibilityChange?: (visible: boolean, data?: { capturedScreenshot?: string }) => void
 }
 
+// Define OcrResult interface
+interface OcrResult {
+  success: boolean;
+  text?: string;
+  error?: string;
+}
+
+// Define types for screenshot response
+interface ScreenshotResponse {
+  status: "success" | "error";
+  screenshot?: string;
+  rect?: { x: number; y: number; width: number; height: number };
+  ocrResult?: OcrResult;
+  error?: string;
+}
+
 const TailorResumePage: React.FC<TailorResumePageProps> = ({
   onSelectFromCollections,
   selectedResume,
@@ -41,11 +57,19 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
   const [isUploading, setIsUploading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isOcrLoading, setIsOcrLoading] = useState(false)
+  const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false)
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
   const [ocrError, setOcrError] = useState<string | null>(null)
   const [ocrWarning, setOcrWarning] = useState<string | null>(null)
   const [lastOcrImage, setLastOcrImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Keep local state in sync with parent prop
+  useEffect(() => {
+    if (jobDescriptionText !== undefined && jobDescriptionText !== jobDescription) {
+      setJobDescription(jobDescriptionText);
+    }
+  }, [jobDescriptionText]);
 
   const validateFile = (file: File) => {
     const allowedTypes = ['application/pdf']
@@ -89,6 +113,330 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
       };
     }
   }
+
+  function cleanOcrText(text: string): string {
+    return text
+      .replace(/[^\x20-\x7E\n]+/g, '') // Keep printable ASCII and newlines
+      .replace(/\n{2,}/g, '\n') // Collapse multiple newlines
+      .replace(/[ \t]+/g, ' ') // Collapse whitespace
+      .replace(/^ +| +$/gm, '') // Trim lines
+      .trim();
+  }
+
+  const cropImage = (imageDataUrl: string, rect: { x: number; y: number; width: number; height: number }): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log('[Tailor] Original image dimensions:', img.width, 'x', img.height);
+        console.log('[Tailor] Crop rect:', rect);
+        
+        // Calculate the scale factor between the captured image and screen
+        const scaleX = img.width / (window.screen.width * window.devicePixelRatio);
+        const scaleY = img.height / (window.screen.height * window.devicePixelRatio);
+        
+        // Adjust the crop coordinates to match the actual image size
+        const adjustedRect = {
+          x: Math.max(0, Math.round(rect.x * scaleX)),
+          y: Math.max(0, Math.round(rect.y * scaleY)),
+          width: Math.min(img.width, Math.round(rect.width * scaleX)),
+          height: Math.min(img.height, Math.round(rect.height * scaleY))
+        };
+        
+        console.log('[Tailor] Adjusted crop rect:', adjustedRect);
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = adjustedRect.width;
+        canvas.height = adjustedRect.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        
+        // Draw the cropped portion with adjusted coordinates
+        ctx.drawImage(
+          img,
+          adjustedRect.x, adjustedRect.y, adjustedRect.width, adjustedRect.height,
+          0, 0, adjustedRect.width, adjustedRect.height
+        );
+        
+        console.log('[Tailor] Canvas dimensions after crop:', canvas.width, 'x', canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
+      
+      img.src = imageDataUrl;
+    });
+  };
+
+  const processOcrImage = async (imageData: string) => {
+    setIsOcrLoading(true);
+    setOcrError(null);
+    setOcrWarning(null);
+    
+    try {
+      console.log('[Tailor] OCR started');
+      const ocrResult = await Tesseract.recognize(imageData, 'eng', {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            console.log(`[Tailor] OCR Progress: ${Math.round(m.progress * 100)}%`);
+          }
+        }
+      });
+
+      let text = cleanOcrText(ocrResult.data.text || '');
+      console.log('[Tailor] OCR finished:', text);
+
+      if (text.length < 20) {
+        setOcrWarning('Extracted text looks incomplete. Try recapturing or retrying.');
+        console.warn('[Tailor] OCR warning: text too short');
+      } else {
+        setOcrWarning(null);
+      }
+
+      // Update both local state and parent component
+      setJobDescription(text);
+      if (onJobDescriptionChange) {
+        onJobDescriptionChange(text);
+      }
+      
+      return { success: true, text };
+    } catch (err) {
+      console.error('[Tailor] OCR failed:', err);
+      setOcrError('OCR failed. Please try again.');
+      return { success: false, error: err instanceof Error ? err.message : 'OCR failed' };
+    } finally {
+      setIsOcrLoading(false);
+    }
+  };
+
+  const handleRetryOcr = async () => {
+    if (!lastOcrImage) return;
+    console.log('[Tailor] Retrying OCR with last captured image');
+    setScreenshotPreview(lastOcrImage);
+    const result = await processOcrImage(lastOcrImage);
+    if (result?.success) {
+      console.log('[Tailor] OCR retry successful');
+    }
+  };
+
+  const handleTakeScreenshot = async () => {
+    // Reset state for a new capture
+    setScreenshotPreview(null);
+    setOcrError(null);
+    setOcrWarning(null);
+    setIsOcrLoading(false);
+    setIsCapturingScreenshot(true);
+    console.log('[Tailor] Screenshot capture started');
+
+    try {
+      if (onSidebarVisibilityChange) onSidebarVisibilityChange(false);
+
+      // Create and setup the snipping tool overlay
+      const existingHost = document.getElementById("snip-shadow-host");
+      if (existingHost) existingHost.remove();
+
+      const host = document.createElement("div");
+      host.id = "snip-shadow-host";
+      Object.assign(host.style, {
+        position: "fixed",
+        top: "0",
+        left: "0",
+        width: "100vw",
+        height: "100vh",
+        zIndex: "2147483647",
+        pointerEvents: "auto"
+      });
+
+      const shadow = host.attachShadow({ mode: "open" });
+      
+      const style = document.createElement("style");
+      style.textContent = `
+        .snip-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          background: rgba(0,0,0,0.2);
+          cursor: crosshair;
+          user-select: none;
+        }
+        .snip-selection {
+          position: fixed;
+          border: 2px dashed #4747E1;
+          background: rgba(74,58,255,0.15);
+          pointer-events: none;
+          display: none;
+        }
+      `;
+      
+      const overlay = document.createElement("div");
+      overlay.className = "snip-overlay";
+      
+      const selection = document.createElement("div");
+      selection.className = "snip-selection";
+
+      shadow.appendChild(style);
+      shadow.appendChild(overlay);
+      shadow.appendChild(selection);
+      document.body.appendChild(host);
+
+      let startX = 0;
+      let startY = 0;
+      let isSelecting = false;
+
+      const cleanup = () => {
+        host.remove();
+        setIsCapturingScreenshot(false);
+        if (onSidebarVisibilityChange) {
+          onSidebarVisibilityChange(true);
+        }
+      };
+
+      return await new Promise((resolve) => {
+        const handleMouseDown = (e: MouseEvent) => {
+          isSelecting = true;
+          startX = e.clientX;
+          startY = e.clientY;
+          selection.style.display = "block";
+          selection.style.left = `${startX}px`;
+          selection.style.top = `${startY}px`;
+          selection.style.width = "0";
+          selection.style.height = "0";
+          console.log('[Tailor] Snip selection started');
+        };
+
+        const handleMouseMove = (e: MouseEvent) => {
+          if (!isSelecting) return;
+
+          const currentX = e.clientX;
+          const currentY = e.clientY;
+          const width = Math.abs(currentX - startX);
+          const height = Math.abs(currentY - startY);
+          const left = Math.min(startX, currentX);
+          const top = Math.min(startY, currentY);
+
+          selection.style.left = `${left}px`;
+          selection.style.top = `${top}px`;
+          selection.style.width = `${width}px`;
+          selection.style.height = `${height}px`;
+        };
+
+        const handleMouseUp = async (e: MouseEvent) => {
+          if (!isSelecting) return;
+          isSelecting = false;
+
+          const endX = e.clientX;
+          const endY = e.clientY;
+          const dpr = window.devicePixelRatio || 1;
+          
+          // Calculate rect relative to viewport without DPR scaling initially
+          const viewportRect = {
+            x: Math.min(startX, endX) + window.scrollX,
+            y: Math.min(startY, endY) + window.scrollY,
+            width: Math.abs(endX - startX),
+            height: Math.abs(endY - startY)
+          };
+          
+          // Apply DPR scaling
+          const rect = {
+            x: Math.round(viewportRect.x * dpr),
+            y: Math.round(viewportRect.y * dpr),
+            width: Math.round(viewportRect.width * dpr),
+            height: Math.round(viewportRect.height * dpr)
+          };
+
+          // Remove listeners
+          overlay.removeEventListener('mousedown', handleMouseDown);
+          overlay.removeEventListener('mousemove', handleMouseMove);
+          overlay.removeEventListener('mouseup', handleMouseUp);
+          
+          cleanup();
+
+          if (rect.width < 5 || rect.height < 5) {
+            console.warn('[Tailor] Snip selection too small, cancelled');
+            resolve(null);
+            return;
+          }
+
+          try {
+            console.log('[Tailor] Sending screenshot capture request with rect:', rect);
+            console.log('[Tailor] Viewport rect (before DPR):', viewportRect);
+            console.log('[Tailor] Device pixel ratio:', dpr);
+            
+            // Show processing state
+            setIsOcrLoading(true);
+            
+            // Capture the screenshot and crop the selected region
+            chrome.runtime.sendMessage(
+              { action: "captureRegionScreenshot", rect },
+              async (response: ScreenshotResponse) => {
+                console.log('[Tailor] Received response from background:', response);
+                
+                if (response?.status === "success" && response.screenshot) {
+                  console.log('[Tailor] Screenshot captured successfully');
+                  
+                  try {
+                    // Crop the image if we have rect info, otherwise use as-is
+                    let finalImage = response.screenshot;
+                    if (response.rect) {
+                      console.log('[Tailor] Cropping image with rect:', response.rect);
+                      finalImage = await cropImage(response.screenshot, response.rect);
+                      console.log('[Tailor] Image cropped successfully');
+                    } else {
+                      console.log('[Tailor] No rect provided, using full screenshot');
+                    }
+                    
+                    setScreenshotPreview(finalImage);
+                    setLastOcrImage(finalImage);
+                    
+                    // Process the cropped image with OCR
+                    console.log('[Tailor] Starting OCR processing');
+                    const ocrResult = await processOcrImage(finalImage);
+                    console.log('[Tailor] OCR processing completed:', ocrResult);
+                    resolve(ocrResult);
+                  } catch (cropError) {
+                    console.error('[Tailor] Image cropping failed:', cropError);
+                    setOcrError('Failed to process screenshot');
+                    setIsOcrLoading(false);
+                    resolve(null);
+                  }
+                } else {
+                  console.error('[Tailor] Screenshot capture failed:', response);
+                  setOcrError(response?.error || "Failed to capture screenshot");
+                  setIsOcrLoading(false);
+                  resolve(null);
+                }
+              }
+            );
+          } catch (error) {
+            console.error("[Tailor] Screenshot capture failed:", error);
+            setOcrError(error instanceof Error ? error.message : "Failed to process screenshot");
+            setScreenshotPreview(null);
+            setIsOcrLoading(false);
+            resolve(null);
+          }
+        };
+
+        // Add listeners
+        overlay.addEventListener('mousedown', handleMouseDown);
+        overlay.addEventListener('mousemove', handleMouseMove);
+        overlay.addEventListener('mouseup', handleMouseUp);
+      });
+    } catch (error) {
+      console.error("[Tailor] Error during screenshot capture:", error);
+      setOcrError(error instanceof Error ? error.message : 'Screenshot capture failed');
+      setScreenshotPreview(null);
+      setIsCapturingScreenshot(false);
+      setIsOcrLoading(false);
+      if (onSidebarVisibilityChange) onSidebarVisibilityChange(true);
+    }
+  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     onFileDialogClose?.()
@@ -195,166 +543,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     }
   }
 
-  function cleanOcrText(text: string): string {
-    return text
-      .replace(/[^\x20-\x7E\n]+/g, '') // Keep printable ASCII and newlines
-      .replace(/\n{2,}/g, '\n') // Collapse multiple newlines
-      .replace(/[ \t]+/g, ' ') // Collapse whitespace
-      .replace(/^ +| +$/gm, '') // Trim lines
-      .trim();
-  }
-
-  const handleRetryOcr = async () => {
-    if (!lastOcrImage) return;
-    setOcrError(null);
-    setOcrWarning(null);
-    setIsOcrLoading(true);
-    setScreenshotPreview(lastOcrImage); // Show the preview again on retry
-    console.log('[Tailor] Retrying OCR...');
-    try {
-      console.log('[Tailor] OCR started (retry)');
-      const ocrResult = await Tesseract.recognize(lastOcrImage, 'eng');
-      let text = cleanOcrText(ocrResult.data.text || '');
-      console.log('[Tailor] OCR finished (retry):', text);
-      if (text.length < 20) {
-        setOcrWarning('Extracted text looks incomplete. Try recapturing or retrying.');
-        console.warn('[Tailor] OCR warning: text too short (retry)');
-      } else {
-        setOcrWarning(null);
-      }
-      setJobDescription(text);
-      onJobDescriptionChange?.(text);
-      setScreenshotPreview(null);
-    } catch (err) {
-      setOcrError('OCR failed. Please try again.');
-      console.error('[Tailor] OCR failed (retry):', err);
-    } finally {
-      setIsOcrLoading(false);
-    }
-  };
-
-  const handleTakeScreenshot = async () => {
-    // Reset state for a new capture
-    setScreenshotPreview(null);
-    setOcrError(null);
-    setOcrWarning(null);
-    console.log('[Tailor] Screenshot capture started');
-    try {
-      if (onSidebarVisibilityChange) onSidebarVisibilityChange(false);
-      const existingHost = document.getElementById("snip-shadow-host");
-      if (existingHost) existingHost.remove();
-      const host = document.createElement("div");
-      host.id = "snip-shadow-host";
-      host.style.position = "fixed";
-      host.style.top = "0";
-      host.style.left = "0";
-      host.style.width = "100vw";
-      host.style.height = "100vh";
-      host.style.zIndex = "2147483647";
-      host.style.pointerEvents = "auto";
-      document.body.appendChild(host);
-      const shadow = host.attachShadow({ mode: "open" });
-      const style = document.createElement("style");
-      style.textContent = `
-        .snip-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.2); cursor: crosshair; user-select: none; }
-        .snip-selection { position: fixed; border: 2px dashed #4747E1; background: rgba(74,58,255,0.15); pointer-events: none; }
-      `;
-      shadow.appendChild(style);
-      const overlay = document.createElement("div");
-      overlay.className = "snip-overlay";
-      shadow.appendChild(overlay);
-      const selectionBox = document.createElement("div");
-      selectionBox.className = "snip-selection";
-      selectionBox.style.display = "none";
-      shadow.appendChild(selectionBox);
-      let startX = 0, startY = 0, endX = 0, endY = 0, isSelecting = false;
-      overlay.addEventListener("mousedown", (e) => {
-        isSelecting = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        selectionBox.style.display = "block";
-        selectionBox.style.left = `${startX}px`;
-        selectionBox.style.top = `${startY}px`;
-        selectionBox.style.width = "0px";
-        selectionBox.style.height = "0px";
-        console.log('[Tailor] Snip selection started');
-      });
-      overlay.addEventListener("mousemove", (e) => {
-        if (!isSelecting) return;
-        endX = e.clientX;
-        endY = e.clientY;
-        const left = Math.min(startX, endX);
-        const top = Math.min(startY, endY);
-        const width = Math.abs(endX - startX);
-        const height = Math.abs(endY - startY);
-        selectionBox.style.left = `${left}px`;
-        selectionBox.style.top = `${top}px`;
-        selectionBox.style.width = `${width}px`;
-        selectionBox.style.height = `${height}px`;
-      });
-      overlay.addEventListener("mouseup", async () => {
-        if (!isSelecting) return;
-        isSelecting = false;
-        const dpr = window.devicePixelRatio || 1;
-        const rect = {
-          x: (Math.min(startX, endX) + window.scrollX) * dpr,
-          y: (Math.min(startY, endY) + window.scrollY) * dpr,
-          width: Math.abs(endX - startX) * dpr,
-          height: Math.abs(endY - startY) * dpr
-        };
-        host.remove();
-        if (rect.width < 5 || rect.height < 5) {
-          if (onSidebarVisibilityChange) onSidebarVisibilityChange(true);
-          console.warn('[Tailor] Snip selection too small, cancelled');
-          return;
-        }
-        setTimeout(() => {
-          chrome.runtime.sendMessage({ action: "captureRegionScreenshot", rect }, async (response) => {
-            if (onSidebarVisibilityChange) onSidebarVisibilityChange(true);
-            if (response.status === "success" && response.screenshot) {
-              setScreenshotPreview(response.screenshot);
-              setLastOcrImage(response.screenshot);
-              setOcrError(null);
-              setOcrWarning(null);
-              setIsOcrLoading(true);
-              console.log('[Tailor] Screenshot captured, OCR started');
-              try {
-                const ocrResult = await Tesseract.recognize(response.screenshot, 'eng');
-                let text = cleanOcrText(ocrResult.data.text || '');
-                console.log('[Tailor] OCR finished:', text);
-                if (text.length < 20) {
-                  setOcrWarning('Extracted text looks incomplete. Try recapturing or retrying.');
-                  console.warn('[Tailor] OCR warning: text too short');
-                } else {
-                  setOcrWarning(null);
-                }
-                setJobDescription(text);
-                onJobDescriptionChange?.(text);
-                setScreenshotPreview(null);
-              } catch (err) {
-                setOcrError('OCR failed. Please try again.');
-                console.error('[Tailor] OCR failed:', err);
-              } finally {
-                setIsOcrLoading(false);
-              }
-            } else {
-              setOcrError("Failed to capture screenshot.");
-              setScreenshotPreview(null);
-              console.error("[Tailor] Custom screenshot failed", response);
-            }
-          });
-        }, 50);
-      });
-    } catch (error) {
-      setOcrError('Screenshot capture failed.');
-      setScreenshotPreview(null);
-      console.error("[Tailor] Error during snipping tool", error);
-      if (onSidebarVisibilityChange) onSidebarVisibilityChange(true);
-      const existingHost = document.getElementById("snip-shadow-host");
-      if (existingHost) existingHost.remove();
-    }
-  };
-
   return (
     <div className="h-full bg-white flex flex-col">
       <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -365,7 +553,12 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
             <label className="block text-xs font-medium text-gray-800 mb-2 flex items-center justify-between">
               <span>Job Description <span className="text-red-500">*</span></span>
-              {isOcrLoading ? (
+              {isCapturingScreenshot ? (
+                <div className="ml-2 flex items-center gap-2 px-3 py-1.5 border border-[#4747E1] bg-white text-[#4747E1] text-xs font-semibold rounded-lg">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Click and drag to select...</span>
+                </div>
+              ) : isOcrLoading ? (
                 <div className="ml-2 flex items-center gap-2 px-3 py-1.5 border border-[#4747E1] bg-white text-[#4747E1] text-xs font-semibold rounded-lg">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Extracting text...</span>
@@ -378,7 +571,11 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
                     className="w-24 h-16 object-cover border border-gray-300 rounded shadow-sm bg-white"
                   />
                   <button
-                    onClick={() => setScreenshotPreview(null)}
+                    onClick={() => {
+                      setScreenshotPreview(null);
+                      setOcrError(null);
+                      setOcrWarning(null);
+                    }}
                     className="text-gray-500 hover:text-gray-700"
                   >
                     ×
@@ -387,9 +584,9 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               ) : (
                 <button
                   type="button"
-                  className="ml-2 flex items-center gap-1 px-3 py-1.5 border border-[#4747E1] bg-white text-[#4747E1] text-xs font-semibold rounded-lg shadow-sm hover:bg-[#f5f5ff] transition-colors"
+                  className="ml-2 flex items-center gap-1 px-3 py-1.5 border border-[#4747E1] bg-white text-[#4747E1] text-xs font-semibold rounded-lg shadow-sm hover:bg-[#f5f5ff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleTakeScreenshot}
-                  disabled={isOcrLoading}
+                  disabled={isOcrLoading || isCapturingScreenshot}
                 >
                   <Camera className="w-4 h-4" />
                   <span>Screenshot</span>
@@ -401,42 +598,57 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               onChange={(e) => {
                 const newValue = e.target.value
                 setJobDescription(newValue)
-                onJobDescriptionChange?.(newValue)
-                // If user types, the preview is no longer relevant
-                if (screenshotPreview) {
+                if (onJobDescriptionChange) {
+                  onJobDescriptionChange(newValue)
+                }
+                // If user types, clear the screenshot preview
+                if (screenshotPreview && newValue !== jobDescription) {
                   setScreenshotPreview(null);
-                  console.log('[Tailor] User typed in textarea, preview cleared');
+                  setOcrError(null);
+                  setOcrWarning(null);
                 }
               }}
               rows={4}
-              className={`w-full text-xs border border-gray-300 rounded-md p-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${isOcrLoading ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-              placeholder="Enter job description here..."
-              disabled={isOcrLoading}
+              className={`w-full text-xs border border-gray-300 rounded-md p-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                isOcrLoading || isCapturingScreenshot ? 'bg-gray-50 cursor-not-allowed' : ''
+              }`}
+              placeholder={isCapturingScreenshot ? "Select an area on the screen..." : "Enter job description here..."}
+              disabled={isOcrLoading || isCapturingScreenshot}
             />
+            {isCapturingScreenshot && (
+              <div className="flex items-center gap-2 mt-2 text-xs text-[#4747E1] bg-blue-50 border border-blue-200 rounded p-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Click and drag on the screen to select the job description area
+              </div>
+            )}
             {isOcrLoading && (
               <div className="flex items-center gap-2 mt-2 text-xs text-[#4747E1]">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Extracting text from screenshot...
               </div>
             )}
-            {ocrWarning && !isOcrLoading && (
+            {ocrWarning && !isOcrLoading && !isCapturingScreenshot && (
               <div className="flex items-center gap-2 mt-2 text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 rounded p-2">
                 <span>⚠️ {ocrWarning}</span>
                 <button
-                  className="ml-auto px-2 py-1 text-xs border border-yellow-400 rounded bg-yellow-100 hover:bg-yellow-200"
+                  className="ml-auto px-2 py-1 text-xs border border-yellow-400 rounded bg-yellow-100 hover:bg-yellow-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleRetryOcr}
-                  disabled={isOcrLoading}
-                >Retry</button>
+                  disabled={isOcrLoading || isCapturingScreenshot}
+                >
+                  Retry
+                </button>
               </div>
             )}
-            {ocrError && !isOcrLoading && (
+            {ocrError && !isOcrLoading && !isCapturingScreenshot && (
               <div className="flex items-center gap-2 mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
                 <span>❌ {ocrError}</span>
                 <button
-                  className="ml-auto px-2 py-1 text-xs border border-red-400 rounded bg-red-100 hover:bg-red-200"
+                  className="ml-auto px-2 py-1 text-xs border border-red-400 rounded bg-red-100 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleRetryOcr}
-                  disabled={isOcrLoading}
-                >Retry</button>
+                  disabled={isOcrLoading || isCapturingScreenshot}
+                >
+                  Retry
+                </button>
               </div>
             )}
           </div>

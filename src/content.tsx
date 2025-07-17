@@ -176,38 +176,18 @@ const PlasmoOverlay = () => {
               sendResponse({ status: "error", message: "Selection too small" });
               return;
             }
+            
+            // Send the rect to background script for screenshot capture and cropping
             chrome.runtime.sendMessage({ action: "captureRegionScreenshot", rect }, (response) => {
-              if (response.status === "success" && response.screenshot) {
-                // Crop the image in the content script
-                const img = new window.Image();
-                img.onload = function () {
-                  const canvas = document.createElement("canvas");
-                  canvas.width = rect.width;
-                  canvas.height = rect.height;
-                  const ctx = canvas.getContext("2d");
-                  ctx.drawImage(
-                    img,
-                    rect.x,
-                    rect.y,
-                    rect.width,
-                    rect.height,
-                    0,
-                    0,
-                    rect.width,
-                    rect.height
-                  );
-                  const cropped = canvas.toDataURL("image/png");
-                  // Open sidebar and show screenshot
-                  window.setResumatchSidebarVisible?.(true);
-                  window.setResumatchSidebarMessageData?.({ initialPage: "screenshot", capturedScreenshot: cropped });
-                  sendResponse({ status: "success", screenshot: cropped });
-                };
-                img.onerror = function () {
-                  sendResponse({ status: "error", message: "Failed to process screenshot" });
-                };
-                img.src = response.screenshot;
+              if (response?.status === "success" && response.screenshot) {
+                console.log("[Snip] Screenshot captured and cropped successfully");
+                // Open sidebar with the cropped screenshot
+                setIsVisible(true);
+                setMessageData({ initialPage: "screenshot", capturedScreenshot: response.screenshot });
+                sendResponse({ status: "success", screenshot: response.screenshot });
               } else {
-                sendResponse({ status: "error", message: response.message || "Failed to capture screenshot" });
+                console.error("[Snip] Screenshot capture failed:", response);
+                sendResponse({ status: "error", message: response?.error || "Failed to capture screenshot" });
               }
             });
           });

@@ -64,7 +64,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
   }, [forceVisible, initialPage, initialCapturedScreenshot]);
 
   useEffect(() => {
-    if (initialJobDescription !== undefined) {
+    if (initialJobDescription !== undefined && initialJobDescription !== jobDescription) {
       setJobDescription(initialJobDescription);
       setIsVisible(true);
       if (initialPage) setCurrentPage(initialPage);
@@ -238,8 +238,12 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                       onJobDescriptionChange={setJobDescription}
                       onFileDialogOpen={onFileDialogOpen}
                       onFileDialogClose={onFileDialogClose}
-                      onSidebarVisibilityChange={(visible) => {
+                      onSidebarVisibilityChange={(visible, data) => {
                         setIsVisible(visible);
+                        if (data?.capturedScreenshot) {
+                          setCapturedScreenshot(data.capturedScreenshot);
+                          setCurrentPage("screenshot");
+                        }
                         if (onClose && !visible) onClose();
                       }}
                     />

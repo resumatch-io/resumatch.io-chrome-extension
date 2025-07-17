@@ -105,13 +105,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Custom region screenshot
   if (message.action === "captureRegionScreenshot" && message.rect) {
+    console.log('[Background] Received captureRegionScreenshot request with rect:', message.rect);
     chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: "png" }, (image) => {
       if (!image) {
-        sendResponse({ status: "error", message: "Failed to capture screenshot" });
+        console.error('[Background] Failed to capture screenshot');
+        sendResponse({ status: "error", error: "Failed to capture screenshot" });
         return;
       }
-      // Just send the full screenshot back; cropping will be done in the content script
-      sendResponse({ status: "success", screenshot: image, rect: message.rect });
+      
+      console.log('[Background] Screenshot captured successfully, sending back with rect');
+      // Send the full screenshot and rect back to content script for cropping
+      sendResponse({ 
+        status: "success", 
+        screenshot: image,
+        rect: message.rect
+      });
     });
     return true;
   }
