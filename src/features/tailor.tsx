@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Upload, CheckCircle, Loader2 } from 'lucide-react'
 import { Camera } from 'lucide-react'
 import { SignedIn, SignedOut } from "@clerk/chrome-extension"
-import Tesseract from 'tesseract.js';
+// Remove Tesseract import
+// import Tesseract from 'tesseract.js';
 
 // Define ParseResult type locally
 interface ParseResult {
@@ -63,6 +64,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
   const [ocrWarning, setOcrWarning] = useState<string | null>(null)
   const [lastOcrImage, setLastOcrImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [sidebarHidden, setSidebarHidden] = useState(false);
 
   // Keep local state in sync with parent prop
   useEffect(() => {
@@ -169,44 +171,40 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     });
   };
 
+  // Replace processOcrImage with API call
   const processOcrImage = async (imageData: string) => {
     setIsOcrLoading(true);
     setOcrError(null);
     setOcrWarning(null);
-    
+
     try {
-      console.log('[Tailor] OCR started');
-      const ocrResult = await Tesseract.recognize(imageData, 'eng', {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            console.log(`[Tailor] OCR Progress: ${Math.round(m.progress * 100)}%`);
+      return await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { action: "OCR_IMAGE", imageData },
+          (data) => {
+            if (!data || !data.success) {
+              setOcrError(data?.error || "OCR failed. Please try again.");
+              resolve({ success: false, error: data?.error || "OCR failed" });
+              setIsOcrLoading(false);
+              return;
+            }
+            let text = data.text || "";
+            if (text.length < 20) {
+              setOcrWarning("Extracted text looks incomplete. Try recapturing or retrying.");
+            } else {
+              setOcrWarning(null);
+            }
+            setJobDescription(text);
+            if (onJobDescriptionChange) onJobDescriptionChange(text);
+            setIsOcrLoading(false);
+            resolve({ success: true, text });
           }
-        }
+        );
       });
-
-      let text = cleanOcrText(ocrResult.data.text || '');
-      console.log('[Tailor] OCR finished:', text);
-
-      if (text.length < 20) {
-        setOcrWarning('Extracted text looks incomplete. Try recapturing or retrying.');
-        console.warn('[Tailor] OCR warning: text too short');
-      } else {
-        setOcrWarning(null);
-      }
-
-      // Update both local state and parent component
-      setJobDescription(text);
-      if (onJobDescriptionChange) {
-        onJobDescriptionChange(text);
-      }
-      
-      return { success: true, text };
     } catch (err) {
-      console.error('[Tailor] OCR failed:', err);
-      setOcrError('OCR failed. Please try again.');
-      return { success: false, error: err instanceof Error ? err.message : 'OCR failed' };
-    } finally {
+      setOcrError("OCR failed. Please try again.");
       setIsOcrLoading(false);
+      return { success: false, error: err instanceof Error ? err.message : "OCR failed" };
     }
   };
 
