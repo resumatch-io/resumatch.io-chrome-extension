@@ -5,7 +5,7 @@ import { Star, Edit2, Download, Trash2, FileText, Copy } from 'lucide-react';
 import { useUser } from '@clerk/chrome-extension';
 
 interface SelectResumePageProps {
-  onResumeSelect?: (resumeName: string) => void;
+  onResumeSelect?: (resumeName: string, resumeText: string) => void;
 }
 
 const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) => {
@@ -51,8 +51,10 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
 
   const handleSelectResume = () => {
     if (selectedResumeId && onResumeSelect) {
-      const resumeName = selectedResumeId === 'my-resume' ? 'My Resume' : `Resume ${selectedResumeId}`;
-      onResumeSelect(resumeName);
+      const selectedResume = collections?.find(item => item.id === selectedResumeId);
+      const resumeName = selectedResume ? selectedResume.name : 'Unknown Resume';
+      const resumeText = selectedResume ? selectedResume.text : '';
+      onResumeSelect(resumeName, resumeText);
     }
   };
 
@@ -63,6 +65,19 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
       month: 'short',
       year: 'numeric',
     });
+  };
+
+  const isPaginationNeeded = collections && collections.length > 10; // Set your threshold here
+
+  // Assuming each page shows 10 resumes
+  const resumesPerPage = 10;
+  const totalPages = collections ? Math.ceil(collections.length / resumesPerPage) : 1;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const handlePageChange = (pageNumber: number) => {
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+    }
   };
 
   return (
@@ -96,11 +111,12 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
           ))}
         </div>
 
-        <p className="text-[10px] text-gray-500 mb-3">
-          {/* You can update this count based on collections.length if needed */}
-          {collections ? `${collections.length} results based on your ` : ''}
-          <span className="text-blue-600 underline cursor-pointer">profile</span> and activity
-        </p>
+        {isPaginationNeeded && (
+          <p className="text-[10px] text-gray-500 mb-3">
+            {collections ? `${collections.length} results based on your ` : ''}
+            <span className="text-blue-600 underline cursor-pointer">profile</span> and activity
+          </p>
+        )}
 
         <div className="space-y-3 pb-4">
           {loading ? (
@@ -173,24 +189,29 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
       </div>
       <div className="border-t border-gray-200 p-4 space-y-3">
         <div className="flex justify-center items-center gap-1 text-xs text-gray-700">
-          <button className="w-6 h-6 flex items-center justify-center rounded-full border bg-white hover:bg-gray-100">
+          <button
+            className="w-6 h-6 flex items-center justify-center rounded-full border bg-white hover:bg-gray-100"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
             &lt;
           </button>
-          {[1, 2, 3].map((n) => (
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
             <button
               key={n}
               className={`w-6 h-6 flex items-center justify-center rounded-full text-[10px] ${
-                n === 1 ? 'bg-purple-200 text-purple-800' : 'bg-white hover:bg-gray-100'
+                n === currentPage ? 'bg-purple-200 text-purple-800' : 'bg-white hover:bg-gray-100'
               }`}
+              onClick={() => handlePageChange(n)}
             >
               {n}
             </button>
           ))}
-          <span className="text-[10px]">...</span>
-          <button className="w-6 h-6 flex items-center justify-center rounded-full border bg-white hover:bg-gray-100 text-[10px]">
-            99
-          </button>
-          <button className="w-6 h-6 flex items-center justify-center rounded-full border bg-white hover:bg-gray-100">
+          <button
+            className="w-6 h-6 flex items-center justify-center rounded-full border bg-white hover:bg-gray-100"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
             &gt;
           </button>
         </div>
@@ -203,7 +224,7 @@ const SelectResumePage: React.FC<SelectResumePageProps> = ({ onResumeSelect }) =
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >
-          {selectedResumeId ? 'Select Resume' : 'Choose a Resume'}
+          {selectedResumeId ? `Selected: ${collections?.find(item => item.id === selectedResumeId)?.name || 'Unknown Resume'}` : 'Choose a Resume'}
         </button>
       </div>
     </div>

@@ -44,6 +44,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
   const [isVisible, setIsVisible] = useState(forceVisible);
   const [currentPage, setCurrentPage] = useState("main");
   const [selectedResume, setSelectedResume] = useState<string | null>(null);
+  const [selectedResumeParsedText, setSelectedResumeParsedText] = useState<string | null>(null);
   const [showLoading, setShowLoading] = useState(false);
   const [showResume, setShowResume] = useState(false);
   const [jobDescription, setJobDescription] = useState(initialJobDescription || '');
@@ -125,8 +126,9 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
     }
   };
 
-  const handleResumeSelection = (resumeName: string) => {
+  const handleResumeSelection = (resumeName: string, resumeText: string) => {
     setSelectedResume(resumeName);
+    setSelectedResumeParsedText(resumeText);
     setCurrentPage("tailor");
   };
 
@@ -146,6 +148,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
     setShowResume(false);
     setShowLoading(false);
     setSelectedResume(null);
+    setSelectedResumeParsedText(null);
     setJobDescription('');
     setCurrentPage("main");
   };
@@ -232,8 +235,12 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                     <TailorResumePage
                       onSelectFromCollections={() => setCurrentPage("select")}
                       selectedResume={selectedResume}
+                      selectedResumeParsedText={selectedResumeParsedText}
                       onTailorStart={handleTailorStart}
-                      onResumeRemove={() => setSelectedResume(null)}
+                      onResumeRemove={() => {
+                        setSelectedResume(null);
+                        setSelectedResumeParsedText(null);
+                      }}
                       jobDescriptionText={jobDescription}
                       onJobDescriptionChange={setJobDescription}
                       onFileDialogOpen={onFileDialogOpen}
@@ -301,7 +308,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                     <div className="space-y-4">
                       <SignedOut>
                         <div className="flex flex-col items-center justify-center py-6 space-y-4 rounded-2xl bg-white shadow-sm">
-                          <SignInButton mode="modal">
+                          <SignInButton mode="redirect">
                             <button className="flex items-center justify-center w-full max-w-xs border border-[#e0cffe] rounded-full py-3 px-5 bg-white text-gray-800 font-semibold text-sm shadow-sm hover:shadow-md transition-all">
                               <img
                                 src={GoogleLogo}
