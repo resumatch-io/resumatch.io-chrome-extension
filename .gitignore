@@ -37,3 +37,7 @@ keys.json
 
 # typescript
 .tsbuildinfo
+
+#python
+*.py[cod]
+./__pycache__

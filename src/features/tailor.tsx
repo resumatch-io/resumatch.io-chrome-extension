@@ -195,7 +195,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               setOcrWarning(null);
             }
             setJobDescription(text);
-            setParsedText(text); // <-- add this line
+            setParsedText(text);
             if (onJobDescriptionChange) onJobDescriptionChange(text);
             setIsOcrLoading(false);
             resolve({ success: true, text });
@@ -211,25 +211,18 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
 
   const handleRetryOcr = async () => {
     if (!lastOcrImage) return;
-    console.log('[Tailor] Retrying OCR with last captured image');
     setScreenshotPreview(lastOcrImage);
     const result = await processOcrImage(lastOcrImage);
-    if (result && typeof result === 'object' && 'success' in result && result.success) {
-      console.log('[Tailor] OCR retry successful');
-    }
   };
 
   const handleTakeScreenshot = async () => {
-    // Reset state for a new capture
     setScreenshotPreview(null);
     setOcrError(null);
     setOcrWarning(null);
     setIsOcrLoading(false);
     setIsCapturingScreenshot(true);
-    console.log('[Tailor] Screenshot capture started');
 
     try {
-      // Keep sidebar visible; overlay will cover interactions
       if (onSidebarVisibilityChange) onSidebarVisibilityChange(false);
 
       // Create and setup the snipping tool overlay
@@ -289,7 +282,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
       const cleanup = () => {
         host.remove();
         setIsCapturingScreenshot(false);
-        // Keep sidebar visible
         if (onSidebarVisibilityChange) onSidebarVisibilityChange(true);
       };
 
@@ -303,7 +295,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           selection.style.top = `${startY}px`;
           selection.style.width = "0";
           selection.style.height = "0";
-          console.log('[Tailor] Snip selection started');
         };
 
         const handleMouseMove = (e: MouseEvent) => {
@@ -354,55 +345,35 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           cleanup();
 
           if (viewportRect.width < 5 || viewportRect.height < 5) {
-            console.warn('[Tailor] Snip selection too small, cancelled');
             resolve(null);
             return;
           }
 
-          // Show processing state
           setIsOcrLoading(true);
 
           try {
-            console.log('[Tailor] Sending screenshot capture request with rect:', rect);
-            console.log('[Tailor] Viewport rect (before DPR):', viewportRect);
-            console.log('[Tailor] Device pixel ratio:', dpr);
-            
-            // Capture the screenshot and crop the selected region
             chrome.runtime.sendMessage(
               { action: "captureRegionScreenshot", rect },
               async (response: ScreenshotResponse) => {
-                console.log('[Tailor] Received response from background:', response);
                 
                 if (response?.status === "success" && response.screenshot) {
-                  console.log('[Tailor] Screenshot captured successfully');
-                  
                   try {
-                    // Crop the image if we have rect info, otherwise use as-is
                     let finalImage = response.screenshot;
                     if (response.rect) {
-                      console.log('[Tailor] Cropping image with rect:', response.rect);
                       finalImage = await cropImage(response.screenshot, response.rect);
-                      console.log('[Tailor] Image cropped successfully');
-                    } else {
-                      console.log('[Tailor] No rect provided, using full screenshot');
                     }
                     
                     setScreenshotPreview(finalImage);
                     setLastOcrImage(finalImage);
                     
-                    // Process the cropped image with OCR
-                    console.log('[Tailor] Starting OCR processing');
                     const ocrResult = await processOcrImage(finalImage);
-                    console.log('[Tailor] OCR processing completed:', ocrResult);
                     resolve(ocrResult);
                   } catch (cropError) {
-                    console.error('[Tailor] Image cropping failed:', cropError);
                     setOcrError('Failed to process screenshot');
                     setIsOcrLoading(false);
                     resolve(null);
                   }
                 } else {
-                  console.error('[Tailor] Screenshot capture failed:', response);
                   setOcrError(response?.error || "Failed to capture screenshot");
                   setIsOcrLoading(false);
                   resolve(null);
@@ -492,6 +463,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     return (selectedResume || uploadedFile) && jobDescription.trim().length > 0
   }
 
+  // In handleTailorResume, use selectedResumeParsedText if present
   const handleTailorResume = async () => {
     // Use parsedText from collection if selected, else from upload
     let parsedTextToUse = selectedResumeParsedText || parsedText;
