@@ -214,6 +214,7 @@ const PlasmoOverlay = () => {
       afterSignOutUrl={window.location.href}
       signInFallbackRedirectUrl={window.location.href}
       signUpFallbackRedirectUrl={window.location.href}
+      syncHost={SYNC_HOST}
       >
       <div
         className={`plasmo-z-50 plasmo-flex plasmo-fixed plasmo-top-32 plasmo-right-8 ${

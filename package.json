@@ -47,9 +47,9 @@
     ],
     "host_permissions": [
       "https://resumatch.io/*",
-      "<all_urls>",
       "$PLASMO_PUBLIC_CLERK_SYNC_HOST/*",
-      "$CLERK_FRONTEND_API/*"
+      "$CLERK_FRONTEND_API/*",
+      "http://localhost/*"
     ],
     "web_accessible_resources": [
       {
