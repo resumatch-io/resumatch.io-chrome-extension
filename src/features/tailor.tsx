@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Upload, CheckCircle, Loader2 } from 'lucide-react'
 import { Camera } from 'lucide-react'
 import { SignedIn, SignedOut } from "@clerk/chrome-extension"
-// Remove Tesseract import
-// import Tesseract from 'tesseract.js';
 
 // Define ParseResult type locally
 interface ParseResult {
@@ -15,7 +13,7 @@ interface ParseResult {
 interface TailorResumePageProps {
   onSelectFromCollections?: () => void
   selectedResume?: string | null
-  selectedResumeParsedText?: string | null // <-- add this prop
+  selectedResumeParsedText?: string | null
   onTailorStart?: (shareableLink: string) => void
   onResumeRemove?: () => void
   jobDescriptionText?: string
@@ -44,7 +42,7 @@ interface ScreenshotResponse {
 const TailorResumePage: React.FC<TailorResumePageProps> = ({
   onSelectFromCollections,
   selectedResume,
-  selectedResumeParsedText, // <-- use this prop
+  selectedResumeParsedText,
   onTailorStart,
   onResumeRemove,
   jobDescriptionText = '',
@@ -494,31 +492,9 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     return (selectedResume || uploadedFile) && jobDescription.trim().length > 0
   }
 
-  // In handleTailorResume, use selectedResumeParsedText if present
   const handleTailorResume = async () => {
     // Use parsedText from collection if selected, else from upload
     let parsedTextToUse = selectedResumeParsedText || parsedText;
-    
-    // If we have selectedResumeParsedText, it's a stringified JSON from the API
-    // We need to parse it to an object for the GENERATE_RESUME request
-    if (selectedResumeParsedText) {
-      try {
-        // Parse the stringified JSON to an object
-        parsedTextToUse = JSON.parse(selectedResumeParsedText);
-        console.log('[Tailor] Parsed collection resume data to object:', parsedTextToUse);
-      } catch (error) {
-        console.error('[Tailor] Error parsing selectedResumeParsedText:', error);
-        // If parsing fails, use it as plain text
-        parsedTextToUse = selectedResumeParsedText;
-      }
-    }
-    
-    console.log('[Tailor] handleTailorResume called');
-    if (selectedResumeParsedText) {
-      console.log('[Tailor] Using parsedText from collection (processed):', typeof parsedTextToUse, parsedTextToUse);
-    } else {
-      console.log('[Tailor] Using parsedText from uploaded file:', parsedTextToUse);
-    }
     
     if (!parsedTextToUse || !jobDescription.trim()) {
       alert('Please upload a resume and enter a job description.')
@@ -527,21 +503,19 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     if (onTailorStart) onTailorStart('')
     setIsGenerating(true)
     try {
-      // Ensure parsedTextToUse is always a string when sending to the API
-      const parsedTextForAPI = typeof parsedTextToUse === 'object' 
-        ? JSON.stringify(parsedTextToUse) 
-        : parsedTextToUse;
-        
-      console.log('[Tailor] Sending GENERATE_RESUME request', { parsedText: parsedTextForAPI, jobDescription });
+      // Always ensure parsedTextToUse is stringified for the API
+      // If it's from collections, it's already stringified JSON
+      // If it's from file upload, it should be stringified
+      const parsedTextForAPI = typeof parsedTextToUse === 'string' 
+        ? parsedTextToUse 
+        : JSON.stringify(parsedTextToUse);
       chrome.runtime.sendMessage(
         { action: 'GENERATE_RESUME', parsedText: parsedTextForAPI, jobDescription },
         (response) => {
-          console.log('[Tailor] GENERATE_RESUME response:', response);
           if (response?.success && response.data?.resume) {
             const summary = Array.isArray(response.data.resume.summary) && response.data.resume.summary.length > 0
               ? response.data.resume.summary[0]
               : '';
-            console.log('[Tailor] Sending SAVE_RESUME request', { parsedText: parsedTextForAPI, text: response.data.resume, jobDescription, summary });
             chrome.runtime.sendMessage(
               {
                 action: 'SAVE_RESUME',
@@ -552,7 +526,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
                 resumeTemplate: 'Default'
               },
               (saveResponse) => {
-                console.log('[Tailor] SAVE_RESUME response:', saveResponse);
                 setIsGenerating(false)
                 if (saveResponse?.success && saveResponse.data?.resumeId) {
                   const link = `https://resumatch.io/share/${saveResponse.data.resumeId}`;
