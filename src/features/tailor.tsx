@@ -21,6 +21,16 @@ interface TailorResumePageProps {
   onFileDialogOpen?: () => void
   onFileDialogClose?: () => void
   onSidebarVisibilityChange?: (visible: boolean, data?: { capturedScreenshot?: string }) => void
+  // External loading state control
+  externalIsUploading?: boolean
+  externalIsGenerating?: boolean
+  externalIsOcrLoading?: boolean
+  externalIsCapturingScreenshot?: boolean
+  // Loading state callbacks
+  onUploadingChange?: (isUploading: boolean) => void
+  onGeneratingChange?: (isGenerating: boolean) => void
+  onOcrLoadingChange?: (isOcrLoading: boolean) => void
+  onCapturingScreenshotChange?: (isCapturingScreenshot: boolean) => void
 }
 
 // Define OcrResult interface
@@ -49,22 +59,54 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
   onJobDescriptionChange,
   onFileDialogOpen,
   onFileDialogClose,
-  onSidebarVisibilityChange
+  onSidebarVisibilityChange,
+  externalIsUploading,
+  externalIsGenerating,
+  externalIsOcrLoading,
+  externalIsCapturingScreenshot,
+  onUploadingChange,
+  onGeneratingChange,
+  onOcrLoadingChange,
+  onCapturingScreenshotChange
 }) => {
   const [jobDescription, setJobDescription] = useState(jobDescriptionText)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [parsedText, setParsedText] = useState<string>('')
   const [isDragOver, setIsDragOver] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [isOcrLoading, setIsOcrLoading] = useState(false)
-  const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false)
+  const [internalIsUploading, setInternalIsUploading] = useState(false)
+  const [internalIsGenerating, setInternalIsGenerating] = useState(false)
+  const [internalIsOcrLoading, setInternalIsOcrLoading] = useState(false)
+  const [internalIsCapturingScreenshot, setInternalIsCapturingScreenshot] = useState(false)
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
   const [ocrError, setOcrError] = useState<string | null>(null)
   const [ocrWarning, setOcrWarning] = useState<string | null>(null)
   const [lastOcrImage, setLastOcrImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [sidebarHidden, setSidebarHidden] = useState(false);
+
+  // Use external loading states if provided, otherwise use internal states
+  const isUploading = externalIsUploading ?? internalIsUploading
+  const isGenerating = externalIsGenerating ?? internalIsGenerating
+  const isOcrLoading = externalIsOcrLoading ?? internalIsOcrLoading
+  const isCapturingScreenshot = externalIsCapturingScreenshot ?? internalIsCapturingScreenshot
+
+  // When external states are provided, update internal functions to use setters that update external state
+  const setIsUploading = (value: boolean) => {
+    if (externalIsUploading === undefined) setInternalIsUploading(value)
+    if (onUploadingChange) onUploadingChange(value)
+  }
+  const setIsGenerating = (value: boolean) => {
+    if (externalIsGenerating === undefined) setInternalIsGenerating(value)
+    if (onGeneratingChange) onGeneratingChange(value)
+  }
+  const setIsOcrLoading = (value: boolean) => {
+    if (externalIsOcrLoading === undefined) setInternalIsOcrLoading(value)
+    if (onOcrLoadingChange) onOcrLoadingChange(value)
+  }
+  const setIsCapturingScreenshot = (value: boolean) => {
+    if (externalIsCapturingScreenshot === undefined) setInternalIsCapturingScreenshot(value)
+    if (onCapturingScreenshotChange) onCapturingScreenshotChange(value)
+  }
 
   // Keep local state in sync with parent prop
   useEffect(() => {
@@ -129,9 +171,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        console.log('[Tailor] Original image dimensions:', img.width, 'x', img.height);
-        console.log('[Tailor] Crop rect (image coordinates):', rect);
-        
         // Ensure the crop coordinates are within bounds
         const safeRect = {
           x: Math.max(0, Math.min(rect.x, img.width - 1)),
@@ -139,8 +178,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           width: Math.max(1, Math.min(rect.width, img.width - Math.max(0, rect.x))),
           height: Math.max(1, Math.min(rect.height, img.height - Math.max(0, rect.y)))
         };
-        
-        console.log('[Tailor] Safe crop rect:', safeRect);
         
         const canvas = document.createElement('canvas');
         canvas.width = safeRect.width;
@@ -159,7 +196,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           0, 0, safeRect.width, safeRect.height
         );
         
-        console.log('[Tailor] Final canvas dimensions:', canvas.width, 'x', canvas.height);
         resolve(canvas.toDataURL('image/png'));
       };
       
@@ -196,16 +232,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               setIsOcrLoading(false);
               return;
             }
-            
-            // Handle new response format - the API response is spread into data
             let text = data.text || data.extractedText || data.content || "";
-            console.log("[Tailor] Extracted text fields:");
-            console.log("  - data.text:", data.text);
-            console.log("  - data.extractedText:", data.extractedText);
-            console.log("  - data.content:", data.content);
-            console.log("[Tailor] Final extracted text:", text);
-            console.log("[Tailor] Text length:", text.length);
-            
             if (text.length < 20) {
               console.warn("[Tailor] Text looks incomplete, showing warning");
               setOcrWarning("Extracted text looks incomplete. Try recapturing or retrying.");
@@ -376,7 +403,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
             chrome.runtime.sendMessage(
               { action: "captureRegionScreenshot", rect },
               async (response: ScreenshotResponse) => {
-                
                 if (response?.status === "success" && response.screenshot) {
                   try {
                     let finalImage = response.screenshot;
@@ -402,7 +428,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               }
             );
           } catch (error) {
-            console.error("[Tailor] Screenshot capture failed:", error);
             setOcrError(error instanceof Error ? error.message : "Failed to process screenshot");
             setScreenshotPreview(null);
             setIsOcrLoading(false);
@@ -416,7 +441,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
         overlay.addEventListener('mouseup', handleMouseUp);
       });
     } catch (error) {
-      console.error("[Tailor] Error during screenshot capture:", error);
       setOcrError(error instanceof Error ? error.message : 'Screenshot capture failed');
       setScreenshotPreview(null);
       setIsCapturingScreenshot(false);
@@ -550,7 +574,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
             <label className="block text-xs font-medium text-gray-800 mb-2 flex items-center justify-between">
               <span>Job Description <span className="text-red-500">*</span></span>
-              {/*
               {isCapturingScreenshot ? (
                 <div className="ml-2 flex items-center gap-2 px-3 py-1.5 border border-[#4747E1] bg-white text-[#4747E1] text-xs font-semibold rounded-lg">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -561,8 +584,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Extracting text...</span>
                 </div>
-              ) :*/}
-              {screenshotPreview ? (
+              ) : screenshotPreview ? (
                 <div className="ml-2 flex items-center gap-2">
                   <img
                     src={screenshotPreview}
@@ -614,7 +636,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               placeholder={isCapturingScreenshot ? "Select an area on the screen..." : "Enter job description here..."}
               disabled={isOcrLoading || isCapturingScreenshot}
             />
-            {/*
             {isCapturingScreenshot && (
               <div className="flex items-center gap-2 mt-2 text-xs text-[#4747E1] bg-blue-50 border border-blue-200 rounded p-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -622,7 +643,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
               </div>
             )}
             {isOcrLoading && (
-              <div className="flex items-center gap-2 mt-2 text-xs text-[#4747E1]">
+              <div className="flex items-center gap-2 mt-2 text-xs text-[#4747E1] bg-blue-50 border border-blue-200 rounded p-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Extracting text from screenshot...
               </div>
@@ -651,7 +672,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
                 </button>
               </div>
             )}
-            */}
           </div>
         </div>
 
@@ -774,19 +794,36 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           type="button"
           disabled={!isFormComplete() || isUploading || isGenerating}
           onClick={handleTailorResume}
-          className={`w-full py-2 rounded-lg shadow-md transition-all text-xs font-medium ${
+          className={`w-full py-2 rounded-lg shadow-md transition-all text-xs font-medium flex items-center justify-center gap-2 ${
             isFormComplete() && !isUploading && !isGenerating
               ? 'bg-[#4747E1] hover:bg-[#4747E1]/90 text-white cursor-pointer'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >
-          {isUploading ? 'Processing Resume...' : isGenerating ? 'Generating...' : 'Tailor My Resume'}
+          {isUploading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Processing Resume...</span>
+            </>
+          ) : isGenerating ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Generating Tailored Resume...</span>
+            </>
+          ) : (
+            <span>Tailor My Resume</span>
+          )}
         </button>
         {!isFormComplete() && !isUploading && !isGenerating && (
           <p className="text-[10px] text-gray-500 text-center mt-2">
             Please {!jobDescription.trim() ? 'enter job description' : ''}
             {!jobDescription.trim() && !(selectedResume || uploadedFile) ? ' and ' : ''}
             {!(selectedResume || uploadedFile) ? 'upload/select a resume' : ''}
+          </p>
+        )}
+        {isGenerating && (
+          <p className="text-[10px] text-[#4747E1] text-center mt-2">
+            This may take a few moments. Please don't close the extension.
           </p>
         )}
       </div>

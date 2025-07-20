@@ -50,6 +50,11 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
   const [jobDescription, setJobDescription] = useState(initialJobDescription || '');
   const [capturedScreenshot, setCapturedScreenshot] = useState<string | null>(null);
   const [shareableLink, setShareableLink] = useState<string | null>(null);
+  // Add loading states for TailorResumePage
+  const [isUploading, setIsUploading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
+  const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
   const { user } = useUser();
   const { signOut } = useClerk();
 
@@ -133,10 +138,10 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
   };
 
   const handleTailorStart = (link?: string) => {
-    setShowLoading(true);
+    setIsGenerating(true);
     setShowResume(false);
     if (link) {
-      setShowLoading(false);
+      setIsGenerating(false);
       setShowResume(true);
       setShareableLink(link);
     } else {
@@ -146,11 +151,10 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
 
   const handleResumeBack = () => {
     setShowResume(false);
-    setShowLoading(false);
+    setIsGenerating(false);
     setSelectedResume(null);
     setSelectedResumeParsedText(null);
-    setJobDescription('');
-    setCurrentPage("main");
+    setShareableLink(null);
   };
 
   const handleScreenshotCaptured = (screenshot: string) => {
@@ -224,12 +228,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
               <>
                 {renderPageHeader("main")}
                 <div className="flex-1 min-h-0">
-                  {showLoading ? (
-                    <div className="flex flex-col items-center justify-center h-full p-6">
-                      <img src={docSignGif} alt="Processing..." className="w-32 h-32 mb-4" />
-                      <p className="text-lg font-bold text-[#4747E1]">Tailoring your resume...</p>
-                    </div>
-                  ) : showResume ? (
+                  {showResume ? (
                     <ResumePage onBack={handleResumeBack} shareableLink={shareableLink || undefined} />
                   ) : (
                     <TailorResumePage
@@ -253,6 +252,14 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
                         }
                         if (onClose && !visible) onClose();
                       }}
+                      externalIsUploading={isUploading}
+                      externalIsGenerating={isGenerating}
+                      externalIsOcrLoading={isOcrLoading}
+                      externalIsCapturingScreenshot={isCapturingScreenshot}
+                      onUploadingChange={setIsUploading}
+                      onGeneratingChange={setIsGenerating}
+                      onOcrLoadingChange={setIsOcrLoading}
+                      onCapturingScreenshotChange={setIsCapturingScreenshot}
                     />
                   )}
                 </div>

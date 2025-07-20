@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@clerk/chrome-extension": "^2.5.3",
+    "axios": "^1.10.0",
     "lucide-react": "^0.525.0",
     "mammoth": "^1.9.1",
     "next": "^15.3.5",
@@ -43,13 +44,15 @@
       "storage",
       "tabs",
       "contextMenus",
-      "activeTab"
+      "activeTab",
+      "<all_urls>"
     ],
     "host_permissions": [
       "https://resumatch.io/*",
       "$PLASMO_PUBLIC_CLERK_SYNC_HOST/*",
       "$CLERK_FRONTEND_API/*",
-      "http://localhost/*"
+      "http://localhost/*",
+      "<all_urls>"
     ],
     "web_accessible_resources": [
       {

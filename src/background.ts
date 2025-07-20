@@ -1,4 +1,5 @@
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/build/pdf";
+import axios from "axios";
 
 const authToken = process.env.authtoken;
 
@@ -10,7 +11,7 @@ chrome.runtime.onInstalled.addListener(() => {
     { id: "find-referrals", title: "Find Referrals" },
     { id: "request-intro", title: "Request Intro" },
     { id: "capture-screenshot", title: "Capture Screenshot" },
-    {id:"Tailor My Resume", title:"Tailor My Resume"}
+    { id: "Tailor My Resume", title: "Tailor My Resume" }
   ]
 
   menuItems.forEach((item) => {
@@ -107,20 +108,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Custom region screenshot
   if (message.action === "captureRegionScreenshot" && message.rect) {
-    console.log('[Background] Received captureRegionScreenshot request with rect:', message.rect);
-    chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: "png" }, (image) => {
-      if (!image) {
-        console.error('[Background] Failed to capture screenshot');
-        sendResponse({ status: "error", error: "Failed to capture screenshot" });
+    // Try to get the current active tab instead of relying on sender.tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length === 0) {
+        sendResponse({ status: "error", error: "No active tab found" });
         return;
       }
-      
-      console.log('[Background] Screenshot captured successfully, sending back with rect');
-      // Send the full screenshot and rect back to content script for cropping
-      sendResponse({ 
-        status: "success", 
-        screenshot: image,
-        rect: message.rect
+
+      const activeTab = tabs[0];
+
+      chrome.tabs.captureVisibleTab(activeTab.windowId, { format: "png" }, (image) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ status: "error", error: chrome.runtime.lastError.message });
+          return;
+        }
+
+        if (!image) {
+          sendResponse({ status: "error", error: "Failed to capture screenshot - no image data" });
+          return;
+        }
+
+        // Send the full screenshot and rect back to content script for cropping
+        sendResponse({
+          status: "success",
+          screenshot: image,
+          rect: message.rect
+        });
       });
     });
     return true;
@@ -182,9 +195,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Save Resume 
   if (message.action === "SAVE_RESUME") {
     const body = {
-      parsedText: message.parsedText ,
+      parsedText: message.parsedText,
       text: message.text,
-      jobDescription: message.jobDescription ,
+      jobDescription: message.jobDescription,
       name: "sai",
       summary: message.summary,
       resumeTemplate: "Default"
@@ -201,7 +214,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(error => {
         sendResponse({ success: false, error: error.message })
       })
-    return true 
+    return true
   }
 
   // Fetch Collections
@@ -211,7 +224,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     fetch("https://resumatch.io/api/external/collections", {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body)
@@ -220,12 +233,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
-        
         return res.text().then(text => {
           if (!text || text.trim() === '') {
             throw new Error("Empty response from server");
           }
-          
+
           try {
             return JSON.parse(text);
           } catch (e) {
@@ -243,79 +255,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "OCR_IMAGE" && message.imageData) {
-    // imageData is a base64 data URL
-    console.log("[Background] ===== OCR_IMAGE REQUEST START =====");
-    console.log("[Background] OCR_IMAGE request received");
-    console.log("[Background] Auth token:", authToken ? `Present (${authToken})` : "Missing");
-    console.log("[Background] Full auth token value:", authToken);
-    console.log("[Background] Image data type:", typeof message.imageData);
-    console.log("[Background] Image data length:", message.imageData.length);
-    console.log("[Background] Image data preview (first 100 chars):", message.imageData.substring(0, 100));
-    console.log("[Background] Image data header:", message.imageData.split(',')[0]);
-    console.log("[Background] Base64 data length:", message.imageData.split(',')[1]?.length);
-    console.log("[Background] Full image data:", message.imageData);
-    
     (async () => {
       try {
-        console.log("[Background] ===== MAKING API REQUEST =====");
-        console.log("[Background] Making OCR API request to:", "https://api.resumatch.io/v1/jd-analyzer/generate/ocr");
-        
-        const requestBody = {
-          resumeId: "RESUMEID",
-          imageData: message.imageData.split(',')[1]
-        };
-        console.log("[Background] Request body:", requestBody);
-        console.log("[Background] Request headers:", {
-          "Authorization": authToken,
-          "Content-Type": "application/json"
-        });
-        
-        const ocrRes = await fetch("https://api.resumatch.io/v1/jd-analyzer/generate/ocr", {
-          method: "POST",
-          headers: {
-            "Authorization": authToken,
-            "Content-Type": "application/json",
+        // Extract raw base64 (remove the data URL prefix if it exists)
+        const base64Data =
+          typeof message.imageData === "string" && message.imageData.startsWith("data:")
+            ? message.imageData.split(",")[1]
+            : message.imageData;
+
+        // Generate a simple resumeId if none is provided
+        const resumeId = message.resumeId || Date.now().toString();
+
+        const { data } = await axios.post(
+          "https://api.resumatch.io/v1/jd-analyzer/generate/ocr",
+          {
+            resumeId,
+            imageData: base64Data,
           },
-          body: JSON.stringify(requestBody),
-        });
-        
-        console.log("[Background] ===== API RESPONSE =====");
-        console.log("[Background] OCR API response status:", ocrRes.status);
-        console.log("[Background] OCR API response status text:", ocrRes.statusText);
-        console.log("[Background] OCR API response headers:", Object.fromEntries(ocrRes.headers.entries()));
-        console.log("[Background] OCR API response ok:", ocrRes.ok);
-        
-        const responseText = await ocrRes.text();
-        console.log("[Background] Raw response text:", responseText);
-        
-        let data;
-        try {
-          data = JSON.parse(responseText);
-          console.log("[Background] Parsed response data:", data);
-          console.log("[Background] Response data type:", typeof data);
-          console.log("[Background] Response data keys:", Object.keys(data));
-        } catch (parseErr) {
-          console.error("[Background] Failed to parse response as JSON:", parseErr);
-          console.log("[Background] Response text was:", responseText);
-          throw new Error(`Invalid JSON response: ${responseText}`);
+          { headers: { "Content-Type": "application/json", Authorization: "AIzaSyDA6Vv5EtQlQPWG8XaQYWJ3UH7Zfu_ZXeQ" } }
+        );
+
+        if (data && data.status === "SUCCESS") {
+          sendResponse({ success: true, text: data.text });
+        } else {
+          sendResponse({ success: false, error: data?.error || "OCR failed" });
         }
-        
-        const finalResponse = { success: true, ...data };
-        console.log("[Background] ===== SENDING RESPONSE =====");
-        console.log("[Background] Final response object:", finalResponse);
-        console.log("[Background] Final response keys:", Object.keys(finalResponse));
-        
-        sendResponse(finalResponse);
       } catch (err) {
-        console.error("[Background] ===== OCR ERROR =====");
-        console.error("[Background] OCR API error:", err);
-        console.error("[Background] Error type:", typeof err);
-        console.error("[Background] Error message:", err.message);
-        console.error("[Background] Error stack:", err.stack);
-        
-        const errorResponse = { success: false, error: err.message || String(err) };
-        console.log("[Background] Sending error response:", errorResponse);
-        sendResponse(errorResponse);
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        sendResponse({ success: false, error: errorMessage });
       }
     })();
     return true; // async
