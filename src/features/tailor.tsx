@@ -209,8 +209,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
 
   // Replace processOcrImage with API call
   const processOcrImage = async (imageData: string) => {
-    console.log("[Tailor] Starting OCR processing");
-    console.log("[Tailor] Image data length:", imageData.length);
     
     setIsOcrLoading(true);
     setOcrError(null);
@@ -218,13 +216,10 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
 
     try {
       return await new Promise((resolve) => {
-        console.log("[Tailor] Sending OCR_IMAGE message to background");
         
         chrome.runtime.sendMessage(
           { action: "OCR_IMAGE", imageData },
           (data) => {
-            console.log("[Tailor] Received OCR response from background:", data);
-            
             if (!data || !data.success) {
               console.error("[Tailor] OCR failed:", data?.error);
               setOcrError(data?.error || "OCR failed. Please try again.");
@@ -234,10 +229,8 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
             }
             let text = data.text || data.extractedText || data.content || "";
             if (text.length < 20) {
-              console.warn("[Tailor] Text looks incomplete, showing warning");
               setOcrWarning("Extracted text looks incomplete. Try recapturing or retrying.");
             } else {
-              console.log("[Tailor] Text extraction successful");
               setOcrWarning(null);
             }
             
@@ -250,7 +243,6 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
         );
       });
     } catch (err) {
-      console.error("[Tailor] OCR processing error:", err);
       setOcrError("OCR failed. Please try again.");
       setIsOcrLoading(false);
       return { success: false, error: err instanceof Error ? err.message : "OCR failed" };
