@@ -173,27 +173,47 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
 
   // Replace processOcrImage with API call
   const processOcrImage = async (imageData: string) => {
+    console.log("[Tailor] Starting OCR processing");
+    console.log("[Tailor] Image data length:", imageData.length);
+    
     setIsOcrLoading(true);
     setOcrError(null);
     setOcrWarning(null);
 
     try {
       return await new Promise((resolve) => {
+        console.log("[Tailor] Sending OCR_IMAGE message to background");
+        
         chrome.runtime.sendMessage(
           { action: "OCR_IMAGE", imageData },
           (data) => {
+            console.log("[Tailor] Received OCR response from background:", data);
+            
             if (!data || !data.success) {
+              console.error("[Tailor] OCR failed:", data?.error);
               setOcrError(data?.error || "OCR failed. Please try again.");
               resolve({ success: false, error: data?.error || "OCR failed" });
               setIsOcrLoading(false);
               return;
             }
-            let text = data.text || "";
+            
+            // Handle new response format - the API response is spread into data
+            let text = data.text || data.extractedText || data.content || "";
+            console.log("[Tailor] Extracted text fields:");
+            console.log("  - data.text:", data.text);
+            console.log("  - data.extractedText:", data.extractedText);
+            console.log("  - data.content:", data.content);
+            console.log("[Tailor] Final extracted text:", text);
+            console.log("[Tailor] Text length:", text.length);
+            
             if (text.length < 20) {
+              console.warn("[Tailor] Text looks incomplete, showing warning");
               setOcrWarning("Extracted text looks incomplete. Try recapturing or retrying.");
             } else {
+              console.log("[Tailor] Text extraction successful");
               setOcrWarning(null);
             }
+            
             setJobDescription(text);
             setParsedText(text);
             if (onJobDescriptionChange) onJobDescriptionChange(text);
@@ -203,6 +223,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
         );
       });
     } catch (err) {
+      console.error("[Tailor] OCR processing error:", err);
       setOcrError("OCR failed. Please try again.");
       setIsOcrLoading(false);
       return { success: false, error: err instanceof Error ? err.message : "OCR failed" };

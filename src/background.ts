@@ -1,5 +1,7 @@
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/build/pdf";
 
+const authToken = process.env.authtoken;
+
 chrome.runtime.onInstalled.addListener(() => {
   const menuItems = [
     { id: "save-job", title: "Save Job" },
@@ -215,17 +217,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       body: JSON.stringify(body)
     })
       .then(res => {
-        console.log("Collections API response status:", res.status);
-        console.log("Collections API response headers:", res.headers);
-        
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
         
-        // Check if response has content
         return res.text().then(text => {
-          console.log("Collections API raw response:", text);
-          
           if (!text || text.trim() === '') {
             throw new Error("Empty response from server");
           }
@@ -233,17 +229,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           try {
             return JSON.parse(text);
           } catch (e) {
-            console.error("Failed to parse JSON:", e);
             throw new Error(`Invalid JSON response: ${text.substring(0, 100)}...`);
           }
         });
       })
       .then(data => {
-        console.log("Collections API parsed data:", data);
         sendResponse({ success: true, data })
       })
       .catch(error => {
-        console.error("Collections API error:", error);
         sendResponse({ success: false, error: error.message })
       })
     return true
@@ -251,22 +244,78 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === "OCR_IMAGE" && message.imageData) {
     // imageData is a base64 data URL
+    console.log("[Background] ===== OCR_IMAGE REQUEST START =====");
+    console.log("[Background] OCR_IMAGE request received");
+    console.log("[Background] Auth token:", authToken ? `Present (${authToken})` : "Missing");
+    console.log("[Background] Full auth token value:", authToken);
+    console.log("[Background] Image data type:", typeof message.imageData);
+    console.log("[Background] Image data length:", message.imageData.length);
+    console.log("[Background] Image data preview (first 100 chars):", message.imageData.substring(0, 100));
+    console.log("[Background] Image data header:", message.imageData.split(',')[0]);
+    console.log("[Background] Base64 data length:", message.imageData.split(',')[1]?.length);
+    console.log("[Background] Full image data:", message.imageData);
+    
     (async () => {
       try {
-        // Convert base64 to Blob
-        const res = await fetch(message.imageData);
-        const blob = await res.blob();
-        const formData = new FormData();
-        formData.append('file', blob, 'screenshot.png');
-
-        const ocrRes = await fetch("http://127.0.0.1:8000/ocr", {
-          method: "POST",
-          body: formData,
+        console.log("[Background] ===== MAKING API REQUEST =====");
+        console.log("[Background] Making OCR API request to:", "https://api.resumatch.io/v1/jd-analyzer/generate/ocr");
+        
+        const requestBody = {
+          resumeId: "RESUMEID",
+          imageData: message.imageData.split(',')[1]
+        };
+        console.log("[Background] Request body:", requestBody);
+        console.log("[Background] Request headers:", {
+          "Authorization": authToken,
+          "Content-Type": "application/json"
         });
-        const data = await ocrRes.json();
-        sendResponse({ success: true, ...data });
+        
+        const ocrRes = await fetch("https://api.resumatch.io/v1/jd-analyzer/generate/ocr", {
+          method: "POST",
+          headers: {
+            "Authorization": authToken,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+        
+        console.log("[Background] ===== API RESPONSE =====");
+        console.log("[Background] OCR API response status:", ocrRes.status);
+        console.log("[Background] OCR API response status text:", ocrRes.statusText);
+        console.log("[Background] OCR API response headers:", Object.fromEntries(ocrRes.headers.entries()));
+        console.log("[Background] OCR API response ok:", ocrRes.ok);
+        
+        const responseText = await ocrRes.text();
+        console.log("[Background] Raw response text:", responseText);
+        
+        let data;
+        try {
+          data = JSON.parse(responseText);
+          console.log("[Background] Parsed response data:", data);
+          console.log("[Background] Response data type:", typeof data);
+          console.log("[Background] Response data keys:", Object.keys(data));
+        } catch (parseErr) {
+          console.error("[Background] Failed to parse response as JSON:", parseErr);
+          console.log("[Background] Response text was:", responseText);
+          throw new Error(`Invalid JSON response: ${responseText}`);
+        }
+        
+        const finalResponse = { success: true, ...data };
+        console.log("[Background] ===== SENDING RESPONSE =====");
+        console.log("[Background] Final response object:", finalResponse);
+        console.log("[Background] Final response keys:", Object.keys(finalResponse));
+        
+        sendResponse(finalResponse);
       } catch (err) {
-        sendResponse({ success: false, error: err.message || String(err) });
+        console.error("[Background] ===== OCR ERROR =====");
+        console.error("[Background] OCR API error:", err);
+        console.error("[Background] Error type:", typeof err);
+        console.error("[Background] Error message:", err.message);
+        console.error("[Background] Error stack:", err.stack);
+        
+        const errorResponse = { success: false, error: err.message || String(err) };
+        console.log("[Background] Sending error response:", errorResponse);
+        sendResponse(errorResponse);
       }
     })();
     return true; // async
