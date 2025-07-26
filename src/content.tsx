@@ -11,9 +11,9 @@ declare global {
   }
 }
 
-const PUBLISHABLE_KEY = process.env.PLASMO_PUBLIC_CLERK_PUBLISHABLE_KEY
+const PUBLISHABLE_KEY = "pk_test_YW1hemluZy1tb25pdG9yLTI5LmNsZXJrLmFjY291bnRzLmRldiQ"
 
-const SYNC_HOST = process.env.PLASMO_PUBLIC_CLERK_SYNC_HOST
+const SYNC_HOST = "http://localhost"
 
 if (!PUBLISHABLE_KEY || !SYNC_HOST) {
   throw new Error(
