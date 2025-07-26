@@ -51,8 +51,10 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 })
 
-// Set the workerSrc for pdfjs-dist
-GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.min.js")
+const weburl = chrome.runtime.getURL("pdf.worker.min.js")
+
+// Set the worker for pdfjs-dist
+GlobalWorkerOptions.worker = new Worker(weburl)
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Unified resume generation and saving
