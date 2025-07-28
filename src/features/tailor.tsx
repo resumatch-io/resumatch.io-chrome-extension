@@ -533,7 +533,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
         ? parsedTextToUse 
         : JSON.stringify(parsedTextToUse);
       chrome.runtime.sendMessage(
-        { action: 'GENERATE_RESUME', parsedText: parsedTextForAPI, jobDescription },
+        { action: 'GENERATE_RESUME', parsedText: parsedTextForAPI, jobDescription: JSON.stringify(jobDescription) },
         (response) => {
           if (response?.success && response.data?.resume) {
             const summary = Array.isArray(response.data.resume.summary) && response.data.resume.summary.length > 0
@@ -544,7 +544,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
                 action: 'SAVE_RESUME',
                 parsedText: parsedTextForAPI,
                 text: response.data.resume,
-                jobDescription,
+                jobDescription: JSON.stringify(jobDescription),
                 summary,
                 resumeTemplate: 'Default'
               },

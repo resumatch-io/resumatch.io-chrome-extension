@@ -56,9 +56,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 })
 
 
-// Set the worker for pdfjs-dist
 
-// GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.min.js");
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
