@@ -24,7 +24,7 @@ import {
         // routerPush={(to) => navigate(to)}
         // routerReplace={(to) => navigate(to, { replace: true })}
         publishableKey={PUBLISHABLE_KEY}
-        syncHost={SYNC_HOST}>
+        >
         <p>extension</p>
         <div className="wf-flex wf-items-center wf-justify-center wf-h-16 wf-w-40">
           <header className="header">
