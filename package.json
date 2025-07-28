@@ -55,7 +55,7 @@
     "web_accessible_resources": [
       {
         "resources": [
-          "pdf.worker.min.js"
+          "assets/pdf.worker.min.js"
         ],
         "matches": [
           "<all_urls>"

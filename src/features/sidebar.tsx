@@ -64,7 +64,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
       if (initialPage) setCurrentPage(initialPage);
       if (initialCapturedScreenshot) {
         setCapturedScreenshot(initialCapturedScreenshot);
-        console.log("[Sidebar] initialCapturedScreenshot received:", initialCapturedScreenshot);
+ 
       }
     }
   }, [forceVisible, initialPage, initialCapturedScreenshot]);
@@ -83,7 +83,7 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
       setCapturedScreenshot(initialCapturedScreenshot);
       setCurrentPage("screenshot");
       setIsVisible(true);
-      console.log("[Sidebar] (effect) Showing sidebar with new screenshot:", initialCapturedScreenshot);
+      
     }
   }, [initialCapturedScreenshot]);
 
@@ -185,10 +185,6 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
     setIsVisible(false);
     if (onClose) onClose();
   };
-
-  if (currentPage === "screenshot") {
-    console.log("[Sidebar] Passing initialScreenshot to Screenshot:", capturedScreenshot);
-  }
 
   // Apply consistent styles to navigation items
   const navItemStyle = "flex items-center space-x-3 px-5 py-3 bg-white text-blue-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition duration-200 ease-in-out text-sm font-medium shadow-sm hover:shadow-md";

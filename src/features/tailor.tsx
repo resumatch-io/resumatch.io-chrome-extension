@@ -49,6 +49,17 @@ interface ScreenshotResponse {
   error?: string;
 }
 
+// Helper to convert ArrayBuffer to base64
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
+
 const TailorResumePage: React.FC<TailorResumePageProps> = ({
   onSelectFromCollections,
   selectedResume,
@@ -133,10 +144,13 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
   const parseDocumentLocal = async (file: File): Promise<ParseResult> => {
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const base64 = arrayBufferToBase64(arrayBuffer);
+      
       return new Promise((resolve) => {
         chrome.runtime.sendMessage(
-          { action: "PARSE_PDF", pdfData: arrayBuffer },
+          { action: "PARSE_PDF", pdfData: base64 },
           (response) => {
+          
             if (response?.success) {
               resolve({ fileName: file.name, parsedText: response.text });
             } else {
@@ -221,7 +235,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
           { action: "OCR_IMAGE", imageData },
           (data) => {
             if (!data || !data.success) {
-              console.error("[Tailor] OCR failed:", data?.error);
+              
               setOcrError(data?.error || "OCR failed. Please try again.");
               resolve({ success: false, error: data?.error || "OCR failed" });
               setIsOcrLoading(false);

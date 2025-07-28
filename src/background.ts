@@ -1,4 +1,8 @@
-import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/build/pdf";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
 import axios from "axios";
 
 const authToken = process.env.authtoken;
@@ -51,37 +55,19 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 })
 
-const weburl = chrome.runtime.getURL("pdf.worker.min.js")
 
 // Set the worker for pdfjs-dist
-GlobalWorkerOptions.worker = new Worker(weburl)
+
+// GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("pdf.worker.min.js");
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Unified resume generation and saving
-  if (message.action === "GENERATE_AND_SAVE_RESUME") {
-    const body = {
-      parsedText: message.parsedText || "",
-      jobDescription: message.jobDescription || "",
-      name: "sample",
-      resumeTemplate: "default"
-    }
-    fetch("https://resumatch.io/api/external/generate-and-save-resume", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    })
-      .then(res => res.json())
-      .then(data => {
-        sendResponse({ success: true, ...data })
-      })
-      .catch(error => {
-        sendResponse({ success: false, error: error.message })
-      })
-    return true
-  }
 
   // PDF parsing in background
   if (message.action === "PARSE_PDF" && message.pdfData) {
+    
+    if (typeof message.pdfData === 'string') {
+  
+    
     (async () => {
       try {
         // Accepts base64 or ArrayBuffer
@@ -93,12 +79,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           // ArrayBuffer
           data = new Uint8Array(message.pdfData);
         }
-        const pdf = await getDocument({ data }).promise;
+        const pdf = await pdfjsLib.getDocument({ data }).promise;
         let text = "";
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const content = await page.getTextContent();
-          text += content.items.map(item => item.str).join(" ") + "\n";
+          text += content.items
+            .filter(item => 'str' in item) // Filter out TextMarkedContent items
+            .map(item => (item as { str: string }).str) // Type assertion for TextItem
+            .join(" ") + "\n";
         }
         sendResponse({ success: true, text });
       } catch (err) {
@@ -107,6 +96,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true; // async response
   }
+}
 
   // Custom region screenshot
   if (message.action === "captureRegionScreenshot" && message.rect) {
@@ -175,10 +165,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Resume generator
   if (message.action === "GENERATE_RESUME") {
+    // Always force parsedText to be a JSON string (double-quoted)
+    const parsedText = JSON.stringify(String(message.parsedText ?? ""));
     const body = {
-      parsedText: message.parsedText || "",
+      parsedText,
       jobDescription: message.jobDescription || ""
     }
+    console.log('[background] GENERATE_RESUME request body:', body);
     fetch("https://resumatch.io/api/external/generate-resume", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -186,9 +179,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
       .then(res => res.json())
       .then(data => {
+        console.log('[background] GENERATE_RESUME response:', data);
         sendResponse({ success: true, data })
       })
       .catch(error => {
+        console.error('[background] GENERATE_RESUME error:', error);
         sendResponse({ success: false, error: error.message })
       })
     return true
@@ -196,14 +191,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Save Resume 
   if (message.action === "SAVE_RESUME") {
+    // Always force parsedText to be a JSON string (double-quoted)
+    const parsedText = JSON.stringify(String(message.parsedText ?? ""));
     const body = {
-      parsedText: message.parsedText,
+      parsedText,
       text: message.text,
       jobDescription: message.jobDescription,
       name: "sai",
       summary: message.summary,
       resumeTemplate: "Default"
     }
+
     fetch("https://resumatch.io/api/external/resumes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -211,9 +209,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
       .then(res => res.json())
       .then(data => {
+   
         sendResponse({ success: true, data })
       })
       .catch(error => {
+
         sendResponse({ success: false, error: error.message })
       })
     return true
