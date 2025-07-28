@@ -532,35 +532,24 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
       const parsedTextForAPI = typeof parsedTextToUse === 'string' 
         ? parsedTextToUse 
         : JSON.stringify(parsedTextToUse);
+      
+      // Use the new combined API endpoint
       chrome.runtime.sendMessage(
-        { action: 'GENERATE_RESUME', parsedText: parsedTextForAPI, jobDescription: JSON.stringify(jobDescription) },
+        { 
+          action: 'GENERATE_AND_SAVE_RESUME', 
+          parsedText: parsedTextForAPI, 
+          jobDescription: jobDescription,
+          name: 'Tailored Resume',
+          summary: '',
+          resumeTemplate: 'Default'
+        },
         (response) => {
-          if (response?.success && response.data?.resume) {
-            const summary = Array.isArray(response.data.resume.summary) && response.data.resume.summary.length > 0
-              ? response.data.resume.summary[0]
-              : '';
-            chrome.runtime.sendMessage(
-              {
-                action: 'SAVE_RESUME',
-                parsedText: parsedTextForAPI,
-                text: response.data.resume,
-                jobDescription: JSON.stringify(jobDescription),
-                summary,
-                resumeTemplate: 'Default'
-              },
-              (saveResponse) => {
-                setIsGenerating(false)
-                if (saveResponse?.success && saveResponse.data?.resumeId) {
-                  const link = `https://resumatch.io/share/${saveResponse.data.resumeId}`;
-                  if (onTailorStart) onTailorStart(link)
-                } else {
-                  alert('There was an error saving your tailored resume.')
-                }
-              }
-            )
+          setIsGenerating(false)
+          if (response?.success && response.data?.resumeId) {
+            const link = `https://resumatch.io/extn/${response.data.resumeId}`;
+            if (onTailorStart) onTailorStart(link)
           } else {
-            setIsGenerating(false)
-            alert('There was an error generating your tailored resume.')
+            alert('There was an error generating and saving your tailored resume.')
           }
         }
       )
@@ -578,7 +567,7 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
         <div className="w-full mb-4">
           <h2 className="text-center text-xs font-semibold text-gray-800 mb-3">Job Description</h2>
           <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
-            <label className="block text-xs font-medium text-gray-800 mb-2 flex items-center justify-between">
+            <label className="text-xs font-medium text-gray-800 mb-2 flex items-center justify-between">
               <span>Job Description <span className="text-red-500">*</span></span>
               {isCapturingScreenshot ? (
                 <div className="ml-2 flex items-center gap-2 px-3 py-1.5 border border-[#4747E1] bg-white text-[#4747E1] text-xs font-semibold rounded-lg">

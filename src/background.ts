@@ -161,7 +161,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // keep channel open for async response
   }
 
-  // Resume generator
+  // Generate and Save Resume (Combined)
+  if (message.action === "GENERATE_AND_SAVE_RESUME") {
+    // parsedText should already be a stringified JSON from the client
+    const parsedText = String(message.parsedText ?? "");
+    const body = {
+      parsedText,
+      jobDescription: message.jobDescription || "",
+      name: message.name || "Resume",
+      summary: message.summary || "",
+      resumeTemplate: message.resumeTemplate || "Default"
+    }
+    console.log('[background] GENERATE_AND_SAVE_RESUME request body:', body);
+    fetch("https://resumatch.io/api/external/generate-and-save-resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(res => res.json())
+      .then(data => {
+        console.log('[background] GENERATE_AND_SAVE_RESUME response:', data);
+        sendResponse({ success: true, data })
+      })
+      .catch(error => {
+        console.error('[background] GENERATE_AND_SAVE_RESUME error:', error);
+        sendResponse({ success: false, error: error.message })
+      })
+    return true
+  }
+
+  // Keep old methods for backward compatibility temporarily
+  // Resume generator (DEPRECATED - use GENERATE_AND_SAVE_RESUME instead)
   if (message.action === "GENERATE_RESUME") {
     // Always force parsedText to be a JSON string (double-quoted)
     const parsedText = JSON.stringify(String(message.parsedText ?? ""));
@@ -187,7 +217,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
 
-  // Save Resume 
+  // Save Resume (DEPRECATED - use GENERATE_AND_SAVE_RESUME instead)
   if (message.action === "SAVE_RESUME") {
     // Always force parsedText to be a JSON string (double-quoted)
     const parsedText = JSON.stringify(String(message.parsedText ?? ""));
