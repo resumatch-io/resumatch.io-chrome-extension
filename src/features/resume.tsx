@@ -72,7 +72,7 @@ const ResumePage: React.FC<ResumePageProps> = ({ onBack, shareableLink }) => {
             </button>
           </div>
         </SignedIn>
-        
+
         <SignedOut>
           <div className="mb-6 text-center">
             <p className="text-xs text-gray-600">Sign in to access more features</p>
@@ -101,28 +101,29 @@ const ResumePage: React.FC<ResumePageProps> = ({ onBack, shareableLink }) => {
           </div>
         </div>
 
-        <SignedIn>
-          <div className="flex flex-col items-center space-y-2">
-            <button
-              onClick={() => alert("Download triggered")}
-              className="flex items-center justify-center px-6 py-2 bg-[#4747E1] text-white rounded-full text-sm font-medium shadow hover:bg-[#3a2aff] transition"
+
+        <div className="flex flex-col items-center space-y-2">
+          <a
+            href={shareableLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center px-6 py-2 bg-[#4747E1] text-white rounded-full text-sm font-medium shadow hover:bg-[#3a2aff] transition"
+          >
+            <FiDownload className="mr-2" />
+            Download
+          </a>
+          {shareableLink && (
+            <a
+              href={shareableLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-[#4747E1] hover:underline"
             >
-              <FiDownload className="mr-2" />
-              Download
-            </button>
-            {shareableLink && (
-              <a
-                href={shareableLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-[#4747E1] hover:underline"
-              >
-                Preview
-              </a>
-            )}
-          </div>
-        </SignedIn>
-        
+              Preview
+            </a>
+          )}
+        </div>
+
         <SignedOut>
           <div className="flex flex-col items-center space-y-2">
             {shareableLink && (

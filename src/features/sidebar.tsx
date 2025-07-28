@@ -138,13 +138,13 @@ export const Sidebar = ({ forceVisible = false, initialPage, capturedScreenshot:
   };
 
   const handleTailorStart = (link?: string) => {
-    setIsGenerating(true);
-    setShowResume(false);
-    if (link) {
+    if (link && link.trim() !== '') {
       setIsGenerating(false);
       setShowResume(true);
       setShareableLink(link);
     } else {
+      setIsGenerating(true);
+      setShowResume(false);
       setShareableLink(null);
     }
   };

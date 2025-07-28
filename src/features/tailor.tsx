@@ -523,7 +523,8 @@ const TailorResumePage: React.FC<TailorResumePageProps> = ({
       alert('Please upload a resume and enter a job description.')
       return
     }
-    if (onTailorStart) onTailorStart('')
+    // Notify parent that generation is starting
+    if (onTailorStart) onTailorStart('') 
     setIsGenerating(true)
     try {
       // Always ensure parsedTextToUse is stringified for the API
